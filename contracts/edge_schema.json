@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Edge Schema",
+  "description": "Transaction edges between accounts.",
+  "type": "object",
+  "required": ["source", "target", "amount", "timestamp"],
+  "properties": {
+    "source": {
+      "type": "string",
+      "description": "Sender account ID"
+    },
+    "target": {
+      "type": "string",
+      "description": "Receiver account ID"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Transaction amount"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Transaction time (ISO 8601)"
+    }
+  }
+}
