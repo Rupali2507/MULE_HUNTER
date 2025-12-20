@@ -1,5 +1,7 @@
 package com.mulehunter.backend.model;
 
+import java.math.BigDecimal;
+
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -10,16 +12,18 @@ public class Transaction {
     private String id;
 
     private String accountId;
-    private double amount;
+    private BigDecimal amount;
     private String merchant;
     private boolean suspectedFraud;
+
+    public Transaction() {}
 
     public static Transaction from(TransactionRequest request) {
         Transaction tx = new Transaction();
         tx.accountId = request.getAccountId();
         tx.amount = request.getAmount();
         tx.merchant = request.getMerchant();
-        tx.suspectedFraud = false;
+        tx.suspectedFraud = false; //default, model decides
         return tx;
     }
 
@@ -31,7 +35,7 @@ public class Transaction {
         return accountId;
     }
 
-    public double getAmount() {
+    public BigDecimal getAmount() {
         return amount;
     }
 

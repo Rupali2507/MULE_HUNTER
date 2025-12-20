@@ -1,9 +1,11 @@
 package com.mulehunter.backend.model;
 
+import java.math.BigDecimal;
+
 public class TransactionRequest {
 
     private String accountId;
-    private double amount;
+    private BigDecimal amount;
     private String merchant;
 
     public String getAccountId() {
@@ -14,11 +16,11 @@ public class TransactionRequest {
         this.accountId = accountId;
     }
 
-    public double getAmount() {
+    public BigDecimal getAmount() {
         return amount;
     }
 
-    public void setAmount(double amount) {
+    public void setAmount(BigDecimal amount) {
         this.amount = amount;
     }
 
