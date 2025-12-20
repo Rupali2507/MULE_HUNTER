@@ -1,5 +1,9 @@
+import Navbar from "./components/Navbar";
+
 export default function Page() {
   return(
-    <div className="text-green-700">HOME PAGE</div>
+    <div>
+      <Navbar/>
+    </div>
   )
 }
