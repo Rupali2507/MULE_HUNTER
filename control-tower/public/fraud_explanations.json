@@ -1,0 +1,480 @@
+[
+  {
+    "node_id": 0,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Transferred large sums of money outward rapidly",
+      "Received money from an unusually large number of accounts"
+    ]
+  },
+  {
+    "node_id": 1,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Transferred large sums of money outward rapidly",
+      "Received money from an unusually large number of accounts"
+    ]
+  },
+  {
+    "node_id": 5,
+    "reasons": [
+      "Received money from an unusually large number of accounts",
+      "Sent money to many different accounts in a short time",
+      "Received unusually high total amount of money"
+    ]
+  },
+  {
+    "node_id": 9,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Sent money to many different accounts in a short time"
+    ]
+  },
+  {
+    "node_id": 10,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Sent money to many different accounts in a short time"
+    ]
+  },
+  {
+    "node_id": 11,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Transferred large sums of money outward rapidly"
+    ]
+  },
+  {
+    "node_id": 19,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Transferred large sums of money outward rapidly"
+    ]
+  },
+  {
+    "node_id": 68,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Sent money to many different accounts in a short time"
+    ]
+  },
+  {
+    "node_id": 140,
+    "reasons": [
+      "Sent money to many different accounts in a short time",
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts"
+    ]
+  },
+  {
+    "node_id": 4,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Transferred large sums of money outward rapidly"
+    ]
+  },
+  {
+    "node_id": 6,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Transferred large sums of money outward rapidly"
+    ]
+  },
+  {
+    "node_id": 15,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Transferred large sums of money outward rapidly"
+    ]
+  },
+  {
+    "node_id": 27,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Sent money to many different accounts in a short time",
+      "Received money from an unusually large number of accounts"
+    ]
+  },
+  {
+    "node_id": 49,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Sent money to many different accounts in a short time"
+    ]
+  },
+  {
+    "node_id": 681,
+    "reasons": [
+      "Received money from an unusually large number of accounts",
+      "Transferred large sums of money outward rapidly",
+      "Received unusually high total amount of money"
+    ]
+  },
+  {
+    "node_id": 16,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Sent money to many different accounts in a short time"
+    ]
+  },
+  {
+    "node_id": 62,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Outgoing transaction volume appears normal",
+      "Received money from an unusually large number of accounts"
+    ]
+  },
+  {
+    "node_id": 69,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Sent money to many different accounts in a short time"
+    ]
+  },
+  {
+    "node_id": 87,
+    "reasons": [
+      "Received money from an unusually large number of accounts",
+      "Received unusually high total amount of money",
+      "Sent money to many different accounts in a short time"
+    ]
+  },
+  {
+    "node_id": 377,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Transferred large sums of money outward rapidly"
+    ]
+  },
+  {
+    "node_id": 31,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Sent money to many different accounts in a short time",
+      "Received money from an unusually large number of accounts"
+    ]
+  },
+  {
+    "node_id": 82,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Transferred large sums of money outward rapidly"
+    ]
+  },
+  {
+    "node_id": 101,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Transferred large sums of money outward rapidly",
+      "Sent money to many different accounts in a short time"
+    ]
+  },
+  {
+    "node_id": 26,
+    "reasons": [
+      "Received money from an unusually large number of accounts",
+      "Received unusually high total amount of money",
+      "Sent money to many different accounts in a short time"
+    ]
+  },
+  {
+    "node_id": 1813,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "High-risk transaction pattern detected (possible mule behavior)"
+    ]
+  },
+  {
+    "node_id": 58,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Transferred large sums of money outward rapidly",
+      "Received money from an unusually large number of accounts"
+    ]
+  },
+  {
+    "node_id": 581,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Transferred large sums of money outward rapidly"
+    ]
+  },
+  {
+    "node_id": 54,
+    "reasons": [
+      "Transferred large sums of money outward rapidly",
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts"
+    ]
+  },
+  {
+    "node_id": 168,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Transferred large sums of money outward rapidly"
+    ]
+  },
+  {
+    "node_id": 35,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Sent money to many different accounts in a short time"
+    ]
+  },
+  {
+    "node_id": 1044,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Transferred large sums of money outward rapidly"
+    ]
+  },
+  {
+    "node_id": 1116,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "High-risk transaction pattern detected (possible mule behavior)",
+      "Sent money to many different accounts in a short time"
+    ]
+  },
+  {
+    "node_id": 873,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "High-risk transaction pattern detected (possible mule behavior)",
+      "Sent money to many different accounts in a short time"
+    ]
+  },
+  {
+    "node_id": 974,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "High-risk transaction pattern detected (possible mule behavior)",
+      "Sent money to many different accounts in a short time"
+    ]
+  },
+  {
+    "node_id": 610,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Transferred large sums of money outward rapidly"
+    ]
+  },
+  {
+    "node_id": 455,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Transferred large sums of money outward rapidly"
+    ]
+  },
+  {
+    "node_id": 675,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Transferred large sums of money outward rapidly"
+    ]
+  },
+  {
+    "node_id": 500,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "High-risk transaction pattern detected (possible mule behavior)",
+      "Sent money to many different accounts in a short time"
+    ]
+  },
+  {
+    "node_id": 1333,
+    "reasons": [
+      "Transferred large sums of money outward rapidly",
+      "Incoming transaction volume appears normal",
+      "Received money from an unusually large number of accounts"
+    ]
+  },
+  {
+    "node_id": 1864,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Transferred large sums of money outward rapidly"
+    ]
+  },
+  {
+    "node_id": 360,
+    "reasons": [
+      "High-risk transaction pattern detected (possible mule behavior)",
+      "Received money from an unusually large number of accounts",
+      "Outgoing transaction volume appears normal"
+    ]
+  },
+  {
+    "node_id": 409,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Transferred large sums of money outward rapidly",
+      "Normal outgoing transaction behavior"
+    ]
+  },
+  {
+    "node_id": 1225,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Transferred large sums of money outward rapidly",
+      "Normal number of incoming transactions"
+    ]
+  },
+  {
+    "node_id": 1659,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Transferred large sums of money outward rapidly",
+      "Normal number of incoming transactions"
+    ]
+  },
+  {
+    "node_id": 1429,
+    "reasons": [
+      "Received money from an unusually large number of accounts",
+      "Received unusually high total amount of money",
+      "Transferred large sums of money outward rapidly"
+    ]
+  },
+  {
+    "node_id": 776,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Transferred large sums of money outward rapidly"
+    ]
+  },
+  {
+    "node_id": 481,
+    "reasons": [
+      "Transferred large sums of money outward rapidly",
+      "Received money from an unusually large number of accounts",
+      "Sent money to many different accounts in a short time"
+    ]
+  },
+  {
+    "node_id": 754,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Transferred large sums of money outward rapidly"
+    ]
+  },
+  {
+    "node_id": 905,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Transferred large sums of money outward rapidly"
+    ]
+  },
+  {
+    "node_id": 1402,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Received money from an unusually large number of accounts",
+      "Transferred large sums of money outward rapidly"
+    ]
+  },
+  {
+    "node_id": 1479,
+    "reasons": [
+      "Transferred large sums of money outward rapidly",
+      "Received money from an unusually large number of accounts",
+      "Received unusually high total amount of money"
+    ]
+  },
+  {
+    "node_id": 1751,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "High-risk transaction pattern detected (possible mule behavior)"
+    ]
+  },
+  {
+    "node_id": 1666,
+    "reasons": [
+      "Received money from an unusually large number of accounts",
+      "Received unusually high total amount of money",
+      "Transferred large sums of money outward rapidly"
+    ]
+  },
+  {
+    "node_id": 855,
+    "reasons": [
+      "Received money from an unusually large number of accounts",
+      "Received unusually high total amount of money",
+      "Transferred large sums of money outward rapidly"
+    ]
+  },
+  {
+    "node_id": 1337,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "High-risk transaction pattern detected (possible mule behavior)",
+      "Sent money to many different accounts in a short time"
+    ]
+  },
+  {
+    "node_id": 1246,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "High-risk transaction pattern detected (possible mule behavior)",
+      "Sent money to many different accounts in a short time"
+    ]
+  },
+  {
+    "node_id": 1706,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Normal number of incoming transactions",
+      "Transferred large sums of money outward rapidly"
+    ]
+  },
+  {
+    "node_id": 1628,
+    "reasons": [
+      "Received money from an unusually large number of accounts",
+      "Received unusually high total amount of money",
+      "Transferred large sums of money outward rapidly"
+    ]
+  },
+  {
+    "node_id": 1506,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "High-risk transaction pattern detected (possible mule behavior)",
+      "Sent money to many different accounts in a short time"
+    ]
+  },
+  {
+    "node_id": 1285,
+    "reasons": [
+      "Received unusually high total amount of money",
+      "Normal outgoing transaction behavior",
+      "Normal number of incoming transactions"
+    ]
+  }
+]

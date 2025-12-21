@@ -1,0 +1,1082 @@
+[
+  {
+    "node_id": 0,
+    "anomaly_score": 0.217,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.201
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.125
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.109
+      }
+    ]
+  },
+  {
+    "node_id": 1,
+    "anomaly_score": 0.214,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.203
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.123
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.111
+      }
+    ]
+  },
+  {
+    "node_id": 5,
+    "anomaly_score": 0.019,
+    "top_factors": [
+      {
+        "feature": "in_degree",
+        "impact": 0.137
+      },
+      {
+        "feature": "out_degree",
+        "impact": 0.135
+      },
+      {
+        "feature": "total_incoming",
+        "impact": 0.124
+      }
+    ]
+  },
+  {
+    "node_id": 9,
+    "anomaly_score": 0.018,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.152
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.142
+      },
+      {
+        "feature": "out_degree",
+        "impact": 0.121
+      }
+    ]
+  },
+  {
+    "node_id": 10,
+    "anomaly_score": 0.071,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.173
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.152
+      },
+      {
+        "feature": "out_degree",
+        "impact": 0.116
+      }
+    ]
+  },
+  {
+    "node_id": 11,
+    "anomaly_score": 0.085,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.184
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.124
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.111
+      }
+    ]
+  },
+  {
+    "node_id": 19,
+    "anomaly_score": 0.012,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.139
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.13
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.112
+      }
+    ]
+  },
+  {
+    "node_id": 68,
+    "anomaly_score": 0.002,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.177
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.081
+      },
+      {
+        "feature": "out_degree",
+        "impact": 0.056
+      }
+    ]
+  },
+  {
+    "node_id": 140,
+    "anomaly_score": 0.048,
+    "top_factors": [
+      {
+        "feature": "out_degree",
+        "impact": 0.099
+      },
+      {
+        "feature": "total_incoming",
+        "impact": 0.09
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.051
+      }
+    ]
+  },
+  {
+    "node_id": 4,
+    "anomaly_score": 0.197,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.186
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.121
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.119
+      }
+    ]
+  },
+  {
+    "node_id": 6,
+    "anomaly_score": 0.185,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.206
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.124
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.106
+      }
+    ]
+  },
+  {
+    "node_id": 15,
+    "anomaly_score": 0.125,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.168
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.145
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.085
+      }
+    ]
+  },
+  {
+    "node_id": 27,
+    "anomaly_score": 0.047,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.152
+      },
+      {
+        "feature": "out_degree",
+        "impact": 0.132
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.13
+      }
+    ]
+  },
+  {
+    "node_id": 49,
+    "anomaly_score": 0.111,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.152
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.151
+      },
+      {
+        "feature": "out_degree",
+        "impact": 0.144
+      }
+    ]
+  },
+  {
+    "node_id": 681,
+    "anomaly_score": 0.003,
+    "top_factors": [
+      {
+        "feature": "in_degree",
+        "impact": 0.131
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.124
+      },
+      {
+        "feature": "total_incoming",
+        "impact": 0.124
+      }
+    ]
+  },
+  {
+    "node_id": 16,
+    "anomaly_score": 0.139,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.173
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.149
+      },
+      {
+        "feature": "out_degree",
+        "impact": 0.115
+      }
+    ]
+  },
+  {
+    "node_id": 62,
+    "anomaly_score": 0.031,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.176
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": -0.137
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.12
+      }
+    ]
+  },
+  {
+    "node_id": 69,
+    "anomaly_score": 0.12,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.202
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.13
+      },
+      {
+        "feature": "out_degree",
+        "impact": 0.112
+      }
+    ]
+  },
+  {
+    "node_id": 87,
+    "anomaly_score": 0.013,
+    "top_factors": [
+      {
+        "feature": "in_degree",
+        "impact": 0.15
+      },
+      {
+        "feature": "total_incoming",
+        "impact": 0.141
+      },
+      {
+        "feature": "out_degree",
+        "impact": 0.12
+      }
+    ]
+  },
+  {
+    "node_id": 377,
+    "anomaly_score": 0.025,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.171
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.163
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.088
+      }
+    ]
+  },
+  {
+    "node_id": 31,
+    "anomaly_score": 0.045,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.152
+      },
+      {
+        "feature": "out_degree",
+        "impact": 0.12
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.119
+      }
+    ]
+  },
+  {
+    "node_id": 82,
+    "anomaly_score": 0.035,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.162
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.132
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.105
+      }
+    ]
+  },
+  {
+    "node_id": 101,
+    "anomaly_score": 0.025,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.164
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.103
+      },
+      {
+        "feature": "out_degree",
+        "impact": 0.062
+      }
+    ]
+  },
+  {
+    "node_id": 26,
+    "anomaly_score": 0.035,
+    "top_factors": [
+      {
+        "feature": "in_degree",
+        "impact": 0.148
+      },
+      {
+        "feature": "total_incoming",
+        "impact": 0.14
+      },
+      {
+        "feature": "out_degree",
+        "impact": 0.136
+      }
+    ]
+  },
+  {
+    "node_id": 1813,
+    "anomaly_score": 0.076,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.17
+      },
+      {
+        "feature": "risk_ratio",
+        "impact": 0.16
+      },
+      {
+        "feature": "account_age_days",
+        "impact": -0.042
+      }
+    ]
+  },
+  {
+    "node_id": 58,
+    "anomaly_score": 0.083,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.198
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.153
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.135
+      }
+    ]
+  },
+  {
+    "node_id": 581,
+    "anomaly_score": 0.078,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.152
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.133
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.13
+      }
+    ]
+  },
+  {
+    "node_id": 54,
+    "anomaly_score": 0.058,
+    "top_factors": [
+      {
+        "feature": "total_outgoing",
+        "impact": 0.138
+      },
+      {
+        "feature": "total_incoming",
+        "impact": 0.134
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.133
+      }
+    ]
+  },
+  {
+    "node_id": 168,
+    "anomaly_score": 0.002,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.154
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.137
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.133
+      }
+    ]
+  },
+  {
+    "node_id": 35,
+    "anomaly_score": 0.02,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.149
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.138
+      },
+      {
+        "feature": "out_degree",
+        "impact": 0.124
+      }
+    ]
+  },
+  {
+    "node_id": 1044,
+    "anomaly_score": 0.007,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.171
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.151
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.142
+      }
+    ]
+  },
+  {
+    "node_id": 1116,
+    "anomaly_score": 0.132,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.24
+      },
+      {
+        "feature": "risk_ratio",
+        "impact": 0.163
+      },
+      {
+        "feature": "out_degree",
+        "impact": 0.048
+      }
+    ]
+  },
+  {
+    "node_id": 873,
+    "anomaly_score": 0.098,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.207
+      },
+      {
+        "feature": "risk_ratio",
+        "impact": 0.162
+      },
+      {
+        "feature": "out_degree",
+        "impact": 0.056
+      }
+    ]
+  },
+  {
+    "node_id": 974,
+    "anomaly_score": 0.137,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.222
+      },
+      {
+        "feature": "risk_ratio",
+        "impact": 0.155
+      },
+      {
+        "feature": "out_degree",
+        "impact": 0.046
+      }
+    ]
+  },
+  {
+    "node_id": 610,
+    "anomaly_score": 0.027,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.166
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.156
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.143
+      }
+    ]
+  },
+  {
+    "node_id": 455,
+    "anomaly_score": 0.062,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.19
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.152
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.131
+      }
+    ]
+  },
+  {
+    "node_id": 675,
+    "anomaly_score": 0.021,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.177
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.161
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.146
+      }
+    ]
+  },
+  {
+    "node_id": 500,
+    "anomaly_score": 0.082,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.184
+      },
+      {
+        "feature": "risk_ratio",
+        "impact": 0.169
+      },
+      {
+        "feature": "out_degree",
+        "impact": 0.052
+      }
+    ]
+  },
+  {
+    "node_id": 1333,
+    "anomaly_score": 0.02,
+    "top_factors": [
+      {
+        "feature": "total_outgoing",
+        "impact": 0.142
+      },
+      {
+        "feature": "total_incoming",
+        "impact": -0.116
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.115
+      }
+    ]
+  },
+  {
+    "node_id": 1864,
+    "anomaly_score": 0.038,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.182
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.152
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.126
+      }
+    ]
+  },
+  {
+    "node_id": 360,
+    "anomaly_score": 0.007,
+    "top_factors": [
+      {
+        "feature": "risk_ratio",
+        "impact": 0.068
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.064
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": -0.053
+      }
+    ]
+  },
+  {
+    "node_id": 409,
+    "anomaly_score": 0.064,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.236
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.151
+      },
+      {
+        "feature": "out_degree",
+        "impact": -0.025
+      }
+    ]
+  },
+  {
+    "node_id": 1225,
+    "anomaly_score": 0.028,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.252
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.136
+      },
+      {
+        "feature": "in_degree",
+        "impact": -0.076
+      }
+    ]
+  },
+  {
+    "node_id": 1659,
+    "anomaly_score": 0.032,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.251
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.145
+      },
+      {
+        "feature": "in_degree",
+        "impact": -0.074
+      }
+    ]
+  },
+  {
+    "node_id": 1429,
+    "anomaly_score": 0.035,
+    "top_factors": [
+      {
+        "feature": "in_degree",
+        "impact": 0.165
+      },
+      {
+        "feature": "total_incoming",
+        "impact": 0.165
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.11
+      }
+    ]
+  },
+  {
+    "node_id": 776,
+    "anomaly_score": 0.044,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.166
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.161
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.134
+      }
+    ]
+  },
+  {
+    "node_id": 481,
+    "anomaly_score": 0.04,
+    "top_factors": [
+      {
+        "feature": "total_outgoing",
+        "impact": 0.141
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.104
+      },
+      {
+        "feature": "out_degree",
+        "impact": 0.047
+      }
+    ]
+  },
+  {
+    "node_id": 754,
+    "anomaly_score": 0.026,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.175
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.165
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.144
+      }
+    ]
+  },
+  {
+    "node_id": 905,
+    "anomaly_score": 0.029,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.173
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.162
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.106
+      }
+    ]
+  },
+  {
+    "node_id": 1402,
+    "anomaly_score": 0.062,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.186
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.161
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.148
+      }
+    ]
+  },
+  {
+    "node_id": 1479,
+    "anomaly_score": 0.002,
+    "top_factors": [
+      {
+        "feature": "total_outgoing",
+        "impact": 0.145
+      },
+      {
+        "feature": "in_degree",
+        "impact": 0.143
+      },
+      {
+        "feature": "total_incoming",
+        "impact": 0.115
+      }
+    ]
+  },
+  {
+    "node_id": 1751,
+    "anomaly_score": 0.131,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.216
+      },
+      {
+        "feature": "risk_ratio",
+        "impact": 0.164
+      },
+      {
+        "feature": "account_age_days",
+        "impact": -0.069
+      }
+    ]
+  },
+  {
+    "node_id": 1666,
+    "anomaly_score": 0.016,
+    "top_factors": [
+      {
+        "feature": "in_degree",
+        "impact": 0.152
+      },
+      {
+        "feature": "total_incoming",
+        "impact": 0.152
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.147
+      }
+    ]
+  },
+  {
+    "node_id": 855,
+    "anomaly_score": 0.01,
+    "top_factors": [
+      {
+        "feature": "in_degree",
+        "impact": 0.162
+      },
+      {
+        "feature": "total_incoming",
+        "impact": 0.16
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.143
+      }
+    ]
+  },
+  {
+    "node_id": 1337,
+    "anomaly_score": 0.082,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.182
+      },
+      {
+        "feature": "risk_ratio",
+        "impact": 0.168
+      },
+      {
+        "feature": "out_degree",
+        "impact": 0.058
+      }
+    ]
+  },
+  {
+    "node_id": 1246,
+    "anomaly_score": 0.107,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.208
+      },
+      {
+        "feature": "risk_ratio",
+        "impact": 0.168
+      },
+      {
+        "feature": "out_degree",
+        "impact": 0.052
+      }
+    ]
+  },
+  {
+    "node_id": 1706,
+    "anomaly_score": 0.062,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.234
+      },
+      {
+        "feature": "in_degree",
+        "impact": -0.21
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.137
+      }
+    ]
+  },
+  {
+    "node_id": 1628,
+    "anomaly_score": 0.0,
+    "top_factors": [
+      {
+        "feature": "in_degree",
+        "impact": 0.143
+      },
+      {
+        "feature": "total_incoming",
+        "impact": 0.14
+      },
+      {
+        "feature": "total_outgoing",
+        "impact": 0.138
+      }
+    ]
+  },
+  {
+    "node_id": 1506,
+    "anomaly_score": 0.12,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.217
+      },
+      {
+        "feature": "risk_ratio",
+        "impact": 0.158
+      },
+      {
+        "feature": "out_degree",
+        "impact": 0.049
+      }
+    ]
+  },
+  {
+    "node_id": 1285,
+    "anomaly_score": 0.004,
+    "top_factors": [
+      {
+        "feature": "total_incoming",
+        "impact": 0.248
+      },
+      {
+        "feature": "out_degree",
+        "impact": -0.066
+      },
+      {
+        "feature": "in_degree",
+        "impact": -0.062
+      }
+    ]
+  }
+]

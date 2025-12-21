@@ -12,7 +12,9 @@ async function dbConnect(){
     }
 
     try{
-        await mongoose.connect(MONGODB_URI!);
+        await mongoose.connect(MONGODB_URI!, {
+            serverSelectionTimeoutMS: 5000,
+        });
         console.log("MongoDB connected successfully!")
     }catch(err){
         console.error("MongoDB Connection Error:", err);
