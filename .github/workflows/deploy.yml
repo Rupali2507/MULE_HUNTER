@@ -39,14 +39,14 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # 1. Ensure the directory exists
+            # 1. Prepare Directory
             mkdir -p ~/control-tower
-            
-            # 2. Go into the directory
             cd ~/control-tower
 
-            # 3. Create/Update the docker-compose file on the EC2 manually 
-            # (This ensures the file is ALWAYS there even if git pull fails)
+            # 2. Login to Docker Hub on EC2
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+
+            # 3. Create the docker-compose.yml
             cat <<EOF > docker-compose.yml
             services:
               next-app:
@@ -62,8 +62,7 @@ jobs:
                 restart: always
             EOF
 
-            # 4. Pull the latest image
-            docker-compose pull || docker compose pull
-
-            # 5. Start the container
-            docker-compose up -d || docker compose up -d
+            # 4. Pull and Restart
+            # We add --quiet to pull and use 'docker-compose up -d' with no-deps
+            docker-compose pull
+            docker-compose up -d --force-recreate
