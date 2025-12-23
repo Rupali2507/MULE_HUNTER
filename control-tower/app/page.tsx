@@ -159,23 +159,24 @@ By combining graph analytics, machine learning, and explainable AI, MuleHunter e
             
             <div></div>
            </div>
-           <div className="grid grid-cols-1 lg:grid-cols-2 p-4">
+           <div className="grid grid-cols-1 lg:grid-cols-2 p-4 ml-15">
             {/* left content */}
             <div className=" py-4 mx-10 my-10 flex flex-col gap-3 ">
-              <h2 className="text-lg font-bold">For Financial Institutions</h2>
+              <h2 className="text-lg font-bold">For Operational Benefits</h2>
               <div className="text-sm text-gray-500">Banks, NBFCs, FinTechs, and Payment Platforms leverage MuleHunter to reduce fraud losses and regulatory risk.</div>
               <div className="grid grid-cols-3">
                  <div className="m-5 p-3">
-                  <div className="text-3xl text-[#caff33]">78%</div>
-                  <div className="text-xs text-gray-400">Faster mule account detection</div>
+                  <div className="text-3xl text-[#caff33]">65%</div>
+                  <div className="text-xs text-gray-400">Reduction in manual review workload
+</div>
                  </div>
                   <div className="m-5 p-3">
-                  <div className="text-3xl text-[#caff33]">63%</div>
-                  <div className="text-xs text-gray-400">Reduction in false positives</div>
+                  <div className="text-3xl text-[#caff33]">70%</div>
+                  <div className="text-xs text-gray-400">Faster fraud case resolution</div>
                  </div>
                   <div className="m-5 p-3">
-                  <div className="text-3xl text-[#caff33]">91%</div>
-                  <div className="text-xs text-gray-400">Improved investigation confidence</div>
+                  <div className="text-3xl text-[#caff33]">45%</div>
+                  <div className="text-xs text-gray-400">Operational cost savings</div>
                  </div>
                  
               </div>
@@ -187,19 +188,19 @@ By combining graph analytics, machine learning, and explainable AI, MuleHunter e
             <div className="grid grid-cols-2 gap-4 py-4 mx-25 my-10 p-2 border border-gray-900 rounded-2xl font-bold">
               <div className="flex flex-col items-center justify-center gap-5 text-xs p-2 border border-gray-900 rounded-2xl ml-6">
                 <FileSearch className="w-5 text-[#caff33]"/>
-                <div className="">Mule Account Identification</div>
+                <div className="">Case-Centric Investigation</div>
               </div>
                <div className="flex flex-col items-center justify-center gap-5 text-xs p-2 border border-gray-900 rounded-2xl mr-6">
                 <ArrowLeftRight className="w-5 text-[#caff33]"/>
-                <div className="">Collusive Ring Detection</div>
+                <div className="">Cash Flow & Path Analysis</div>
               </div>
                <div className="flex flex-col items-center justify-center gap-5 text-xs p-2 border border-gray-900 rounded-2xl ml-6 ">
                 <GitBranch className="w-5 text-[#caff33]"/>
-                <div className="">Transaction Anomaly Detection</div>
+                <div className="">Network Expansion Analysis</div>
               </div>
                <div className="flex flex-col items-center justify-center gap-5 text-xs p-2 border border-gray-900 rounded-2xl mr-6">
                 <Brain className="w-5 text-[#caff33]"/>
-                <div className="">Explainable Fraud Decisions</div>
+                <div className="">AI-Powered Fraud Narratives</div>
               </div>
                
              
