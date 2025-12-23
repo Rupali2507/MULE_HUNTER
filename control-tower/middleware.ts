@@ -11,7 +11,11 @@ export default auth((req) => {
 
   const isLoginPage = nextUrl.pathname === "/login";
   const isAdminPage = nextUrl.pathname.startsWith("/admin");
+  const isApiAuthRoute = nextUrl.pathname.startsWith("/api/auth");
+  const isPublicApiRoute = nextUrl.pathname.startsWith("/api/user/role");
 
+  if (isApiAuthRoute) return NextResponse.next();
+  
   if (isLoginPage && isLoggedIn) {
     return NextResponse.redirect(new URL("/", nextUrl));
   }
@@ -29,5 +33,5 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
