@@ -28,7 +28,7 @@ def generate_dataset():
 
     # --- STEP 1: Benign Economy (Scale-Free) ---
     print("   Building Scale-Free Network...")
-    # LOGIC FIX: We convert to DiGraph (Directed) immediately to preserve money flow direction
+    # We convert to DiGraph (Directed) immediately to preserve money flow direction
     # 'barabasi_albert_graph' creates an undirected graph structure
     G_base = nx.barabasi_albert_graph(n=NUM_USERS, m=2, seed=42)
     G = nx.DiGraph() 
@@ -43,7 +43,7 @@ def generate_dataset():
     # Initialize Node Properties
     for i in G.nodes():
         G.nodes[i]['is_fraud'] = 0
-        G.nodes[i]['type'] = 'Legit' # Useful for us, but we will filter this out for Rupali later
+        G.nodes[i]['type'] = 'Legit' 
         G.nodes[i]['account_age'] = random.randint(30, 3650)
 
     # --- STEP 2: Mule Rings (Star Topology) ---
@@ -60,7 +60,6 @@ def generate_dataset():
         G.nodes[criminal]['type'] = 'Criminal'
         
         # Fan-Out (Mule -> Criminal)
-        # We explicitly update the edge with transaction data
         G.add_edge(mule, criminal, amount=random.randint(50000, 100000), timestamp=100)
         
         # Fan-In (Victims -> Mule)
@@ -83,7 +82,6 @@ def generate_dataset():
 
     # --- STEP 4: Feature Calculation ---
     print("   Calculating Graph Centrality (PageRank)...")
-    # This might fail if you don't have scipy, but I assume you installed it now
     try:
         pagerank_scores = nx.pagerank(G)
     except ImportError:
@@ -109,12 +107,11 @@ def generate_dataset():
     
     df_nodes = pd.DataFrame(node_data)
 
-    # STRICT SCHEMA FILTER (The Winning Move)
-    # We remove 'type' and 'name' so Rupali's validator passes 100%
+    # STRICT SCHEMA FILTER
     required_cols = ["node_id", "account_age_days", "balance", "in_out_ratio", "pagerank", "tx_velocity", "is_fraud"]
     df_nodes = df_nodes[required_cols] # Discard everything else
     
-    df_nodes.to_csv(os.path.join(OUTPUT_DIR, "nodes.csv"), index=False)
+    df_nodes.to_csv(os.path.join(OUTPUT_DIR, "nodes.csv"), index=False)  
     print(f"   Saved nodes.csv ({len(df_nodes)} rows) - STRICT SCHEMA MODE")
 
     # 5.2 PREPARE TRANSACTIONS
@@ -132,7 +129,7 @@ def generate_dataset():
     # Ensure Edge Schema Order
     df_edges = df_edges[["source", "target", "amount", "timestamp"]]
     
-    df_edges.to_csv(os.path.join(OUTPUT_DIR, "transactions.csv"), index=False)
+    df_edges.to_csv(os.path.join(OUTPUT_DIR, "transactions.csv"), index=False)  
     print(f"   Saved transactions.csv ({len(df_edges)} rows)")
     
     print(f"SUCCESS! Data locked in shared-data.")

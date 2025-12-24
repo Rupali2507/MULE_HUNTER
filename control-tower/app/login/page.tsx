@@ -1,3 +1,4 @@
+import Footer from "../components/Footer";
 import LoginForm from "../components/LoginForm";
 import Navbar from "../components/Navbar";
 
@@ -12,9 +13,7 @@ export default function Home() {
         <LoginForm />
       </div>
 
-      <footer className="bg-[#1A1A1A] py-4 border-t border-gray-800 text-center text-gray-500 text-[10px] md:text-xs">
-        © 2025 MULE HUNTER. All Rights Reserved.
-      </footer>
+      <Footer/>
     </main>
   );
 }

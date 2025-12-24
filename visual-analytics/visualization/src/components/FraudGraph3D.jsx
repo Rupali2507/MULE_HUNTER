@@ -8,29 +8,87 @@ export default function FraudGraph3D({
   alertedNodeId,
 }) {
   const fgRef = useRef();
-  const containRef = useRef();
+  const containerRef = useRef();
+
   const [rawGraph, setRawGraph] = useState(null);
   const [showOnlyFraud, setShowOnlyFraud] = useState(false);
   const [activeNodeId, setActiveNodeId] = useState(null);
+  const [dimensions, setDimensions] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
+
+  // LOAD GRAPH DATA (CORRECT + SAFE)
 
   useEffect(() => {
-    fetch("./nodes_viz.json")
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
+    const controller = new AbortController();
+
+    async function loadGraph() {
+      try {
+        const res = await fetch(`http://localhost:8080/api/graph`, {
+          signal: controller.signal,
+        });
+
+        const text = await res.text();
+
+        if (text.trim().startsWith("<")) {
+          console.error("HTML received instead of JSON:", text);
+          return;
         }
-        return res.json();
-      })
-      .then((data) => setRawGraph(data))
-      .catch((err) => console.error("Could not load graph data:", err));
+
+        const data = JSON.parse(text);
+
+        // NORMALIZE Backend DATA
+
+        const normalized = {
+          nodes: data.nodes.map((n) => ({
+            id: n.nodeId,
+            is_anomalous: n.isAnomalous,
+            height: n.anomalyScore,
+            volume: n.volume ?? 1,
+            color: n.isAnomalous ? "#ff4d4d" : "#22c55e",
+          })),
+          links: data.links
+            .filter((l) => l.source && l.target)
+            .map((l) => ({
+              source: l.source,
+              target: l.target,
+              amount: Number(l.amount ?? 1),
+            })),
+        };
+
+        setRawGraph(normalized);
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          console.error("Could not load graph data:", err);
+        }
+      }
+    }
+
+    loadGraph();
+    return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    const onResize = () => {
+      setDimensions({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // FRAUD-ONLY FILTER
 
   const visibleGraph = useMemo(() => {
     if (!rawGraph) return null;
     if (!showOnlyFraud) return rawGraph;
 
     const fraudIds = new Set(
-      rawGraph.nodes.filter((n) => n.is_anomalous === 1).map((n) => n.id)
+      rawGraph.nodes.filter((n) => n.is_anomalous).map((n) => n.id)
     );
 
     return {
@@ -43,21 +101,10 @@ export default function FraudGraph3D({
     };
   }, [rawGraph, showOnlyFraud]);
 
-  useEffect(() => {
-    if (!containRef.current) return;
-
-    const observer = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      setDimensions({ width, height });
-    });
-
-    observer.observe(containRef.current);
-    return () => observer.disconnect();
-  }, []);
+  // CAMERA DEFAULT
 
   useEffect(() => {
     if (!fgRef.current || !rawGraph) return;
-
     fgRef.current.cameraPosition(
       { x: 0, y: 0, z: 900 },
       { x: 0, y: 0, z: 0 },
@@ -65,9 +112,10 @@ export default function FraudGraph3D({
     );
   }, [rawGraph]);
 
+  // CAMERA ON NODE SELECT
+
   useEffect(() => {
     if (!selectedNode || !fgRef.current) return;
-
     fgRef.current.cameraPosition(
       {
         x: selectedNode.x * 1.3,
@@ -79,6 +127,8 @@ export default function FraudGraph3D({
     );
   }, [selectedNode]);
 
+  // LOADING STATE
+
   if (!visibleGraph) {
     return (
       <div className="flex h-screen items-center justify-center text-white">
@@ -89,6 +139,7 @@ export default function FraudGraph3D({
 
   return (
     <div className="relative h-screen w-full bg-linear-to-br from-black via-slate-900 to-black">
+      {/* HEADER */}
       <div className="absolute top-6 left-6 z-10 max-w-md">
         <h1 className="text-xl font-semibold text-white">
           Fraud Transaction Network (3D)
@@ -98,6 +149,7 @@ export default function FraudGraph3D({
         </p>
       </div>
 
+      {/* LEGEND + FILTER */}
       <div className="absolute top-24 left-6 z-10 rounded-xl bg-black/70 p-4 text-sm text-gray-200 backdrop-blur">
         <label className="flex items-center gap-2 cursor-pointer">
           <input
@@ -125,21 +177,25 @@ export default function FraudGraph3D({
         </div>
       </div>
 
-      <div ref={containRef} className="h-full w-full">
+      {/* GRAPH */}
+      <div ref={containerRef} className="h-full w-full">
         <ForceGraph3D
+          width={dimensions.width}
+          height={dimensions.height}
           ref={fgRef}
           graphData={visibleGraph}
-          onNodeClick={(node) => {
-            onNodeSelect(node);
-            setActiveNodeId(node.id);
-          }}
           backgroundColor="rgba(0,0,0,0)"
           enableNodeDrag={false}
           warmupTicks={120}
           cooldownTicks={0}
+          onNodeClick={(node) => {
+            onNodeSelect(node);
+            setActiveNodeId(node.id);
+          }}
           nodeThreeObject={(node) => {
             const isSelected = selectedNode?.id === node.id;
             const isAlerted = alertedNodeId === node.id;
+
             const geometry = new THREE.SphereGeometry(
               isAlerted ? 7 : isSelected ? 6 : 3,
               18,
@@ -162,20 +218,19 @@ Status: ${n.is_anomalous ? "Fraud" : "Normal"}`
           linkColor={(link) => {
             if (!activeNodeId) return "rgba(180,180,180,0.35)";
 
-            const isConnected =
-              link.source.id === activeNodeId ||
-              link.target.id === activeNodeId;
+            const src = link.source.id ?? link.source;
+            const tgt = link.target.id ?? link.target;
 
-            if (!isConnected) return "rgba(180,180,180,0.15)";
+            if (src !== activeNodeId && tgt !== activeNodeId)
+              return "rgba(180,180,180,0.15)";
 
-            // Only fraud nodes turn edges red
-            const selectedNode = visibleGraph.nodes.find(
+            const activeNode = visibleGraph.nodes.find(
               (n) => n.id === activeNodeId
             );
 
-            if (selectedNode?.is_anomalous) return "rgba(255,80,80,0.9)";
-
-            return "rgba(180,180,180,0.35)";
+            return activeNode?.is_anomalous
+              ? "rgba(255,80,80,0.9)"
+              : "rgba(180,180,180,0.35)";
           }}
           linkWidth={(l) => {
             if (!selectedNode) return Math.min(1.2, Math.log(l.amount + 1));
@@ -191,15 +246,15 @@ Status: ${n.is_anomalous ? "Fraud" : "Normal"}`
         />
       </div>
 
+      {/* FOOTER */}
       <div className="absolute bottom-4 w-full text-center text-xs text-white">
         Left-click rotate · Scroll zoom · Right-click pan
       </div>
+
+      {/* ALERT PING */}
       {alertedNodeId && (
         <div className="absolute inset-0 pointer-events-none">
-          <div
-            className="absolute left-1/2 top-1/2 h-32 w-32 
-      animate-ping rounded-full border-2 border-red-500 opacity-75"
-          />
+          <div className="absolute left-1/2 top-1/2 h-32 w-32 animate-ping rounded-full border-2 border-red-500 opacity-75" />
         </div>
       )}
     </div>

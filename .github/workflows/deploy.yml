@@ -1,0 +1,71 @@
+name: Deploy Control Tower
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Docker Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./control-tower
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/control-tower:latest
+          build-args: |
+            MONGODB_URI=${{ secrets.MONGODB_URI }}
+            AUTH_SECRET=${{ secrets.AUTH_SECRET }}
+            AUTH_URL=${{ secrets.AUTH_URL }}
+            NEXT_PUBLIC_EMAILJS_SERVICE_ID=${{ secrets.NEXT_PUBLIC_EMAILJS_SERVICE_ID }}
+            NEXT_PUBLIC_EMAILJS_TEMPLATE_ID=${{ secrets.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID }}
+            NEXT_PUBLIC_EMAILJS_PUBLIC_KEY=${{ secrets.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY }}
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH to EC2 and Deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # 1. Prepare Directory
+            mkdir -p ~/control-tower
+            cd ~/control-tower
+
+            # 2. Login to Docker Hub
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+
+            # 3. Create/Update docker-compose.yml
+            cat <<EOF > docker-compose.yml
+            services:
+              next-app:
+                image: ${{ secrets.DOCKERHUB_USERNAME }}/control-tower:latest
+                container_name: control-tower-app
+                ports:
+                  - "3000:3000"
+                environment:
+                  - MONGODB_URI=${{ secrets.MONGODB_URI }}
+                  - AUTH_SECRET=${{ secrets.AUTH_SECRET }}
+                  - AUTH_URL=${{ secrets.AUTH_URL }}
+                  - NODE_ENV=production
+                restart: always
+            EOF
+
+            # 4. Cleanup old broken state and start fresh
+            # Using 'docker compose' (the modern plugin) instead of 'docker-compose'
+            docker compose down --remove-orphans
+            docker compose pull
+            docker compose up -d

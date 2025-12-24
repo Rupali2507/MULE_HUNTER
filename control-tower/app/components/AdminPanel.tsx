@@ -55,7 +55,6 @@ export default function AdminPanel({ initialUsers, session }: { initialUsers: Us
             {session?.user?.name} <span className="text-[#CAFF33] text-xs ml-2">● ONLINE</span>
           </p>
         </div>
-        <LogoutButton />
       </div>
 
       <div className="flex-1 flex flex-col md:flex-row gap-6 p-6 md:p-10 overflow-hidden">
@@ -112,7 +111,7 @@ export default function AdminPanel({ initialUsers, session }: { initialUsers: Us
             <button 
               type="submit" 
               disabled={isPending}
-              className="w-full bg-[#CAFF33] py-3 rounded-lg font-bold text-black text-sm hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-[#CAFF33] cursor-pointer hover:bg-[#afd149] py-3 rounded-lg font-bold text-black text-sm hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isPending ? "PROVISIONING..." : `CREATE ${role.toUpperCase()} ACCOUNT`}
             </button>

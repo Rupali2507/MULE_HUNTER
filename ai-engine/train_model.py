@@ -1,86 +1,93 @@
+import pandas as pd
 import torch
 import torch.nn.functional as F
 from torch_geometric.nn import SAGEConv
-from torch_geometric.loader import DataLoader
+from torch_geometric.data import Data
 import os
+import numpy as np
 
-# CONFIG
-SHARED_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "shared-data")
-MODEL_PATH = os.path.join(SHARED_DATA_DIR, "mule_model.pth")
+# --- CONFIGURATION ---
+# Use the same relative path logic as the API so it works in Docker
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SHARED_DATA_DIR = os.path.join(BASE_DIR, "..", "shared-data")
 
-# 1. DEFINE THE BRAIN (Graph Neural Network)
+NODES_PATH = os.path.join(SHARED_DATA_DIR, "nodes.csv")
+EDGES_PATH = os.path.join(SHARED_DATA_DIR, "transactions.csv")
+MODEL_SAVE_PATH = os.path.join(SHARED_DATA_DIR, "mule_model.pth")
+DATA_SAVE_PATH = os.path.join(SHARED_DATA_DIR, "processed_graph.pt")
+
+# --- DEFINING THE GNN (Must match inference_service.py exactly) ---
 class MuleSAGE(torch.nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels):
         super(MuleSAGE, self).__init__()
-        # Layer 1: Look at immediate neighbors (1-Hop)
-        # SAGEConv is the "GraphSAGE" layer
         self.conv1 = SAGEConv(in_channels, hidden_channels)
-        
-        # Layer 2: Look at neighbors' neighbors (2-Hop)
         self.conv2 = SAGEConv(hidden_channels, out_channels)
 
     def forward(self, x, edge_index):
-        # Step 1: Aggregate info from neighbors
         x = self.conv1(x, edge_index)
-        x = F.relu(x) # Activation function (add non-linearity)
-        x = F.dropout(x, p=0.5, training=self.training) # Drop data to prevent overfitting
-        
-        # Step 2: Aggregate again (deeper pattern recognition)
+        x = F.relu(x)
         x = self.conv2(x, edge_index)
-        
-        # Step 3: Output probability (Log Softmax for classification)
         return F.log_softmax(x, dim=1)
 
-# 2. THE TRAINING LOOP
-def train_gnn():
-    print("🧠 Loading the Brain Food (Graph Data)...")
-    data_path = os.path.join(SHARED_DATA_DIR, "processed_graph.pt")
-    
-    if not os.path.exists(data_path):
-        raise FileNotFoundError("❌ Run feature_engineering.py first!")
-        
-    # weights_only=False allows loading complex objects like our Graph Data
-    data = torch.load(data_path, weights_only=False)
-    
-    # Initialize the Model
-    # Input Features = 5 (The math clues we calculated)
-    # Hidden Layer = 16 (The 'thinking' neurons)
-    # Output = 2 (Classes: 0=Safe, 1=Fraud)
-    model = MuleSAGE(in_channels=5, hidden_channels=16, out_channels=2)
-    
-    # Optimizer (Adam is the standard for deep learning)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
-    
-    # Weighted Loss: Fraud is rare (imbalanced). 
-    # We tell the model: "Missing a fraud is 5x worse than flagging a safe user."
-    # This fixes the "Class Imbalance" problem.
-    weights = torch.tensor([1.0, 5.0]) 
-    criterion = torch.nn.NLLLoss(weight=weights)
+def train():
+    print("🚀 Starting Training Pipeline...")
 
-    print("🏋️‍♂️  Training Started (Teaching the Mule Hunter)...")
-    model.train()
+    # 1. Load Data
+    if not os.path.exists(NODES_PATH) or not os.path.exists(EDGES_PATH):
+        raise FileNotFoundError("❌ Data not found! Run POST /generate-data first.")
+
+    print("   Loading CSVs...")
+    df_nodes = pd.read_csv(NODES_PATH)
+    df_edges = pd.read_csv(EDGES_PATH)
+
+    # 2. Prepare Graph Data
+    # Align Node IDs (Map String IDs to Index 0..N)
+    # We need a mapping because PyTorch Geometric needs integer indices
+    node_mapping = {id: idx for idx, id in enumerate(df_nodes['node_id'].astype(str))}
     
-    for epoch in range(101):
-        optimizer.zero_grad() # Clear previous calculations
-        
-        out = model(data.x, data.edge_index) # Forward pass (Guess)
-        loss = criterion(out, data.y) # Calculate Error (Loss)
-        
-        loss.backward() # Backward pass (Learn)
-        optimizer.step() # Update weights
+    # Create Edge Index (Source -> Target)
+    src = df_edges['source'].astype(str).map(node_mapping).values
+    dst = df_edges['target'].astype(str).map(node_mapping).values
+    
+    # Filter out edges where nodes might be missing (safety check)
+    mask = ~np.isnan(src) & ~np.isnan(dst)
+    edge_index = torch.tensor([src[mask], dst[mask]], dtype=torch.long)
+
+    # 3. Create Features (x)
+    feature_cols = ["account_age_days", "balance", "in_out_ratio", "pagerank", "tx_velocity"]
+    x = torch.tensor(df_nodes[feature_cols].values, dtype=torch.float)
+
+    # 4. Create Labels (y)
+    y = torch.tensor(df_nodes['is_fraud'].values, dtype=torch.long)
+
+    # Pack it into a PyG Data Object
+    graph_data = Data(x=x, edge_index=edge_index, y=y)
+    
+    # SAVE THE GRAPH DATA (So inference can load it later)
+    torch.save(graph_data, DATA_SAVE_PATH)
+    print(f"Processed Graph saved to {DATA_SAVE_PATH}")
+
+    # 5. Initialize Model
+    # Input features = 5 (account_age, balance, ratio, pagerank, velocity)
+    model = MuleSAGE(in_channels=5, hidden_channels=16, out_channels=2)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
+
+    # 6. Training Loop
+    model.train()
+    print("   Training GNN (This may take a moment)...")
+    for epoch in range(100): # 100 Epochs is enough for demo
+        optimizer.zero_grad()
+        out = model(graph_data.x, graph_data.edge_index)
+        loss = F.nll_loss(out, graph_data.y)
+        loss.backward()
+        optimizer.step()
         
         if epoch % 10 == 0:
-            # Calculate Accuracy
-            pred = out.argmax(dim=1)
-            correct = (pred == data.y).sum()
-            acc = int(correct) / int(data.num_nodes)
-            print(f"   Epoch {epoch:03d}: Loss {loss.item():.4f} | Accuracy: {acc:.4f}")
+            print(f"   Epoch {epoch}: Loss {loss.item():.4f}")
 
-    # 3. SAVE THE MODEL
-    torch.save(model.state_dict(), MODEL_PATH)
-    print(f"✅ SUCCESS! Trained model saved to: {MODEL_PATH}")
-    print("   The Brain is ready to be deployed.")
+    # 7. Save Model
+    torch.save(model.state_dict(), MODEL_SAVE_PATH)
+    print(f"🎉 Model saved to {MODEL_SAVE_PATH}")
 
 if __name__ == "__main__":
-    train_gnn()
-    
+    train()

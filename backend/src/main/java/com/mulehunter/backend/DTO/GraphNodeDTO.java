@@ -1,6 +1,9 @@
 package com.mulehunter.backend.DTO;
 
 public record GraphNodeDTO(
-        String id,
-        boolean isAnomalous
+    String nodeId,
+    double anomalyScore,
+    boolean isAnomalous,
+    long volume
 ) {}
+

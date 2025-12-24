@@ -4,14 +4,14 @@ import torch
 import torch.nn.functional as F
 from torch_geometric.nn import SAGEConv
 import os
+import subprocess  
 
-#CONFIG
-SHARED_DATA_DIR = "/app/shared-data"
+# --- CONFIGURATION ---
+SHARED_DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "shared-data")
 MODEL_PATH = os.path.join(SHARED_DATA_DIR, "mule_model.pth")
 DATA_PATH = os.path.join(SHARED_DATA_DIR, "processed_graph.pt")
 
-# DEFINING THE BRAIN ARCHITECTURE 
-# We must redefine the class so PyTorch knows what "MuleSAGE" means
+# --- DEFINING THE BRAIN ---
 class MuleSAGE(torch.nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels):
         super(MuleSAGE, self).__init__()
@@ -24,71 +24,78 @@ class MuleSAGE(torch.nn.Module):
         x = self.conv2(x, edge_index)
         return F.log_softmax(x, dim=1)
 
-# INITIALIZING THE APP 
-app = FastAPI(title="Mule Hunter AI Engine")
+# --- API SCHEMAS ---
+class RiskRequest(BaseModel):
+    node_id: int
 
-# Global variables to hold the brain in memory
+class RiskResponse(BaseModel):
+    node_id: int
+    risk_score: float
+    verdict: str
+    model_version: str
+
+# --- INITIALIZING THE APP ---
+app = FastAPI(title="Mule Hunter AI Service", version="Final-Gold")
+
 model = None
 graph_data = None
 
 @app.on_event("startup")
 def load_brain():
     global model, graph_data
-    print("🧠 Waking up the Mule Hunter Brain...")
-    
-    if not os.path.exists(MODEL_PATH) or not os.path.exists(DATA_PATH):
-        raise FileNotFoundError("❌ Model or Data not found! Run train_model.py first.")
+    if os.path.exists(MODEL_PATH) and os.path.exists(DATA_PATH):
+        try:
+            graph_data = torch.load(DATA_PATH, weights_only=False)
+            model = MuleSAGE(in_channels=5, hidden_channels=16, out_channels=2)
+            model.load_state_dict(torch.load(MODEL_PATH, map_location=torch.device('cpu')))
+            model.eval()
+            print("Brain loaded.")
+        except Exception as e:
+            print(f"Load failed: {e}")
 
-    # 1. Load Data (to get features)
-    # weights_only=False is required for complex Graph objects
-    graph_data = torch.load(DATA_PATH, weights_only=False)
-    
-    # 2. Load Model
-    model = MuleSAGE(in_channels=5, hidden_channels=16, out_channels=2)
-    model.load_state_dict(torch.load(MODEL_PATH, weights_only=True))
-    model.eval() # Set to "Evaluation Mode" (No learning, just predicting)
-    
-    print(" Brain is active and listening on Port 8000.")
+# --- 1. GENERATE DATA ENDPOINT (MISSING IN YOURS) ---
+@app.post("/generate-data")
+def generate_simulation():
+    """For data simulation"""
+    try:
+        subprocess.run(["python", "data_generator.py"], check=True)
+        return {"status": "New Banking Simulation Created (nodes.csv updated)"}
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/")
-def health_check():
-    return {"status": "active", "model": "MuleSAGE v1"}
+# --- 2. TRAIN ENDPOINT ---
+@app.post("/train-model")
+def train_brain():
+    """Triggers training and reloads the brain"""
+    try:
+        subprocess.run(["python", "train_model.py"], check=True)
+        load_brain() # Reload immediately
+        return {"status": "Training Complete. Model Updated."}
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/predict/{node_id}")
-def predict_risk(node_id: int):
-    """
-    Input: Node ID (e.g., 500)
-    Output: Risk Score (0 to 1) and Label
-    """
+# --- 3. PREDICT ENDPOINT ---
+@app.post("/predict", response_model=RiskResponse)
+def predict_risk(request: RiskRequest):
     global model, graph_data
+    if model is None:
+        raise HTTPException(status_code=503, detail="System not ready. Call /generate-data then /train-model first.")
     
-    # Validation: Does this user exist?
+    node_id = request.node_id
     if node_id >= graph_data.num_nodes:
-        raise HTTPException(status_code=404, detail="User ID not found in graph")
+        raise HTTPException(status_code=404, detail="User not found.")
 
-    # 1. Get the specific features for this user
-    # We pass the WHOLE graph, but we only care about the result for 'node_id'
-    # In a real GNN, we need neighbors, so we pass everything.
     with torch.no_grad():
         out = model(graph_data.x, graph_data.edge_index)
-        
-        # Get the probability for THIS specific node
-        # exp() converts log_softmax back to normal probability (0.0 to 1.0)
-        probs = out[node_id].exp() 
-        
-        # Class 1 is Fraud. Let's get that probability.
-        fraud_risk = float(probs[1])
-        
-    # 2. Determine Verdict
+        fraud_risk = float(out[node_id].exp()[1])
+
     verdict = "SAFE"
-    if fraud_risk > 0.75:
-        verdict = "HIGH RISK (MULE)"
-    elif fraud_risk > 0.4:
-        verdict = "SUSPICIOUS"
+    if fraud_risk > 0.8: verdict = "CRITICAL (MULE)"
+    elif fraud_risk > 0.5: verdict = "SUSPICIOUS"
 
     return {
-        "node_id": node_id,
-        "risk_score": round(fraud_risk, 4),
-        "verdict": verdict
+        "node_id": node_id, 
+        "risk_score": round(fraud_risk, 4), 
+        "verdict": verdict, 
+        "model_version": "Gold-v1"
     }
-

@@ -1,80 +1,32 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import useExplanations from "../hooks/useExplanations";
 
-export default function NodeInspector({ node, explanations, onClose }) {
+export default function NodeInspector({ node, onClose }) {
   const [aiText, setAiText] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loadingAI, setLoadingAI] = useState(false);
   const [closing, setClosing] = useState(false);
   const [activeSlide, setActiveSlide] = useState("shap");
 
-  if (!node) return null;
-  console.log("Selected Node:", node);
-  const isAnomalous = node.is_anomalous === 1;
-  const reasons = explanations?.[String(node.id)]?.reasons || [];
+  const nodeId = node ? Number(node.id) : null;
+  const { explanation, loading } = useExplanations(nodeId);
 
-  const generateAIExplanation = async () => {
-    setLoading(true);
+  if (!node) return null;
+
+  const isAnomalous = node.is_anomalous === true || node.is_anomalous === 1;
+
+  const reasons = explanation?.reasons ?? [];
+
+  const generateAIExplanation = () => {
+    setLoadingAI(true);
 
     setTimeout(() => {
       setAiText(
         `Account ${node.id} shows unusual transaction behavior with high connectivity 
 to anomalous accounts. Rapid inflow and outflow patterns indicate potential mule activity.`
       );
-      setLoading(false);
+      setLoadingAI(false);
     }, 1200);
   };
-  function ShapSlide({ reasons, isAnomalous }) {
-    if (!reasons.length) {
-      return (
-        <p className="text-xs text-gray-500 italic">
-          No strong SHAP signals for this account.
-        </p>
-      );
-    }
-
-    return (
-      <ul className="space-y-2">
-        {reasons.map((reason, i) => (
-          <li
-            key={i}
-            className={`flex gap-2 items-start p-2 rounded-md text-sm
-            ${
-              isAnomalous
-                ? "bg-red-950/40 text-red-200"
-                : "bg-green-950/40 text-green-200"
-            }`}
-          >
-            <span className="mt-0.5">▸</span>
-            <span>{reason}</span>
-          </li>
-        ))}
-      </ul>
-    );
-  }
-  function AISlide({ aiText, loading, onGenerate }) {
-    return (
-      <>
-        <div className="min-h-20 mb-3">
-          {aiText ? (
-            <div className="bg-zinc-800 p-3 rounded-md text-sm text-gray-200">
-              {aiText}
-            </div>
-          ) : (
-            <p className="text-xs text-gray-500 italic">
-              Generate a natural language explanation based on model signals.
-            </p>
-          )}
-        </div>
-
-        <button
-          onClick={onGenerate}
-          disabled={loading}
-          className="w-full rounded-md bg-white text-black py-2 text-sm font-medium hover:bg-gray-200"
-        >
-          {loading ? "Generating..." : "Generate AI Summary"}
-        </button>
-      </>
-    );
-  }
 
   const handleClose = () => {
     setClosing(true);
@@ -88,17 +40,18 @@ to anomalous accounts. Rapid inflow and outflow patterns indicate potential mule
 
   return (
     <aside
-      className={`fixed right-0 top-0 pt-10 z-100 w-95 h-screen overflow-y-auto animate-slide-in
-    ${
-      isAnomalous
-        ? "bg-zinc-900 border-l border-red-600 shadow-[0_0_20px_rgba(239,68,68,0.4)]"
-        : "bg-zinc-900 border-l border-green-600 shadow-[0_0_20px_rgba(34,197,94,0.4)]"
-    }
-  `}
+      className={`fixed right-0 top-0 pt-10 z-50 w-[380px] h-screen overflow-y-auto
+        ${closing ? "animate-slide-out" : "animate-slide-in"}
+        ${
+          isAnomalous
+            ? "bg-zinc-900 border-l border-red-600 shadow-[0_0_20px_rgba(239,68,68,0.4)]"
+            : "bg-zinc-900 border-l border-green-600 shadow-[0_0_20px_rgba(34,197,94,0.4)]"
+        }
+      `}
     >
-      {/* Header */}
-      <div className="flex justify-between">
-        <h2 className="text-lg font-semibold pl-5">
+      {/* HEADER */}
+      <div className="flex justify-between items-center px-5">
+        <h2 className="text-lg font-semibold">
           Node Forensics:{" "}
           <span className={isAnomalous ? "text-red-400" : "text-green-400"}>
             ACC{node.id}
@@ -106,27 +59,28 @@ to anomalous accounts. Rapid inflow and outflow patterns indicate potential mule
         </h2>
         <button
           onClick={handleClose}
-          className="text-gray-400 hover:text-white pr-6 cursor-pointer"
+          className="text-gray-400 hover:text-white cursor-pointer"
         >
           ✕
         </button>
       </div>
 
-      {/* Account Summary */}
+      {/* ACCOUNT SUMMARY */}
       <Section title="Account Summary">
         <Metric
           label="Risk Status"
-          value={node.is_anomalous === 1 ? "Anomalous" : "Normal"}
-          highlight={node.is_anomalous === 1}
+          value={isAnomalous ? "Anomalous" : "Normal"}
+          highlight={isAnomalous}
         />
-
         <Metric label="Risk Score" value={(node.height * 100).toFixed(1)} />
       </Section>
 
-      {/* Metrics */}
+      {/* METRICS */}
       <Section title="Metrics">
-        <Metric label="Total Transactions" value={Math.round(node.size)} />
-
+        <Metric
+          label="Total Transactions"
+          value={Math.round(node.volume ?? node.size ?? 0)}
+        />
         <Metric label="Suspicious vs Normal" value="40 / 160" />
         <Metric
           label="Connectivity Score"
@@ -135,50 +89,44 @@ to anomalous accounts. Rapid inflow and outflow patterns indicate potential mule
         />
       </Section>
 
-      {/* Explainability */}
+      {/* EXPLAINABILITY */}
       <Section title="Explainability">
-        {/* Tabs */}
+        {/* TABS */}
         <div className="flex mb-4 rounded-md overflow-hidden border border-zinc-700">
-          <button
+          <TabButton
+            active={activeSlide === "shap"}
             onClick={() => setActiveSlide("shap")}
-            className={`flex-1 py-2 text-sm font-medium
-        ${
-          activeSlide === "shap"
-            ? "bg-zinc-800 text-white"
-            : "bg-zinc-900 text-gray-400 hover:text-white"
-        }`}
           >
             SHAP Explainability
-          </button>
+          </TabButton>
 
-          <button
+          <TabButton
+            active={activeSlide === "ai"}
             onClick={() => setActiveSlide("ai")}
-            className={`flex-1 py-2 text-sm font-medium
-        ${
-          activeSlide === "ai"
-            ? "bg-zinc-800 text-white"
-            : "bg-zinc-900 text-gray-400 hover:text-white"
-        }`}
           >
             AI Explanation
-          </button>
+          </TabButton>
         </div>
 
-        {/* Slide Content */}
+        {/* SLIDES */}
         <div className="min-h-[140px] transition-all">
           {activeSlide === "shap" ? (
-            <ShapSlide reasons={reasons} isAnomalous={isAnomalous} />
+            <ShapSlide
+              reasons={reasons}
+              loading={loading}
+              isAnomalous={isAnomalous}
+            />
           ) : (
             <AISlide
               aiText={aiText}
-              loading={loading}
+              loading={loadingAI}
               onGenerate={generateAIExplanation}
             />
           )}
         </div>
       </Section>
 
-      {/* Actions */}
+      {/* ACTIONS */}
       <div className="flex gap-3 p-5">
         <button className="flex-1 rounded-md border border-green-500 text-green-400 py-2">
           Mark as Safe
@@ -217,5 +165,79 @@ function Metric({ label, value, highlight, color }) {
         {value}
       </span>
     </div>
+  );
+}
+
+function TabButton({ active, onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex-1 py-2 text-sm font-medium
+        ${
+          active
+            ? "bg-zinc-800 text-white"
+            : "bg-zinc-900 text-gray-400 hover:text-white"
+        }
+      `}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ShapSlide({ reasons, loading, isAnomalous }) {
+  if (loading) return <p className="text-xs text-gray-500">Loading…</p>;
+
+  if (!reasons.length) {
+    return (
+      <p className="text-xs text-gray-500 italic">
+        No strong SHAP signals for this account.
+      </p>
+    );
+  }
+
+  return (
+    <ul className="space-y-2">
+      {reasons.map((reason, i) => (
+        <li
+          key={i}
+          className={`flex gap-2 items-start p-2 rounded-md text-sm
+            ${
+              isAnomalous
+                ? "bg-red-950/40 text-red-200"
+                : "bg-green-950/40 text-green-200"
+            }`}
+        >
+          <span className="mt-0.5">▸</span>
+          <span>{reason}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function AISlide({ aiText, loading, onGenerate }) {
+  return (
+    <>
+      <div className="min-h-[80px] mb-3">
+        {aiText ? (
+          <div className="bg-zinc-800 p-3 rounded-md text-sm text-gray-200">
+            {aiText}
+          </div>
+        ) : (
+          <p className="text-xs text-gray-500 italic">
+            Generate a natural language explanation based on model signals.
+          </p>
+        )}
+      </div>
+
+      <button
+        onClick={onGenerate}
+        disabled={loading}
+        className="w-full rounded-md bg-white text-black py-2 text-sm font-medium hover:bg-gray-200"
+      >
+        {loading ? "Generating..." : "Generate AI Summary"}
+      </button>
+    </>
   );
 }

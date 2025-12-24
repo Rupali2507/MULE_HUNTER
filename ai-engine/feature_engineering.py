@@ -97,7 +97,7 @@ def build_graph_data():
     edge_index = torch.tensor([sources, targets], dtype=torch.long)
 
     data = Data(x=x, edge_index=edge_index, y=y)
-    torch.save(data, os.path.join(SHARED_DATA_DIR, "processed_graph.pt"))
+    torch.save(data, os.path.join(SHARED_DATA_DIR, "processed_graph.pt")) # This line should be changed. Instead of storing output data locally, it should call an api which send data into database.
     
     print(" SUCCESS! Feature engineering and data enrichment complete.")
 

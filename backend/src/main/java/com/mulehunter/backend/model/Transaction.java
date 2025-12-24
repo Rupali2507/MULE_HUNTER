@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
+import org.springframework.data.mongodb.core.mapping.FieldType;
 
 @Document(collection = "transactions")
 public class Transaction {
@@ -14,7 +16,9 @@ public class Transaction {
     private String sourceAccount;
     private String targetAccount;
 
+    @Field(targetType = FieldType.DECIMAL128)
     private BigDecimal amount;
+    
     private boolean suspectedFraud;
 
     public Transaction() {}

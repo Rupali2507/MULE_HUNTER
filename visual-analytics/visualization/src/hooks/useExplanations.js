@@ -1,38 +1,54 @@
 import { useEffect, useState } from "react";
 
-export default function useExplanations() {
-  const [explanations, setExplanations] = useState({});
+export default function useExplanations(nodeId) {
+  const [explanation, setExplanation] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch("./fraud_explanations.json")
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(`Server returned ${res.status} ${res.statusText}`);
+    if (nodeId === null || nodeId === undefined) {
+      setExplanation(null);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    async function loadExplanation() {
+      try {
+        setLoading(true);
+
+        const res = await fetch(
+          `http://localhost:8080/api/graph/node/${nodeId}`,
+          { signal: controller.signal }
+        );
+
+        const text = await res.text();
+
+        // Safety: frontend HTML instead of API
+        if (text.trim().startsWith("<")) {
+          console.error("HTML received instead of JSON:", text);
+          return;
         }
 
-        const contentType = res.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-          throw new TypeError(
-            "Oops, we didn't get JSON! Check if the file exists in the public folder."
-          );
-        }
+        const data = JSON.parse(text);
 
-        return res.json();
-      })
-      .then((data) => {
-        const map = {};
-
-        data?.forEach((item) => {
-          map[item.node_id] = {
-            reasons: item.reasons,
-          };
+        setExplanation({
+          reasons: data.reasons ?? [],
+          shapFactors: data.shap_factors ?? data.shapFactors ?? [],
+          anomalyScore: data.anomalyScore,
+          isAnomalous: data.isAnomalous,
         });
-        setExplanations(map);
-      })
-      .catch((err) => {
-        console.error("Failed to load explanations:", err.message);
-      });
-  }, []);
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          console.error("Failed to load explanations:", err.message);
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
 
-  return explanations;
+    loadExplanation();
+    return () => controller.abort();
+  }, [nodeId]);
+
+  return { explanation, loading };
 }
