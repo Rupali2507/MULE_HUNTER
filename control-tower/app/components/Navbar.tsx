@@ -3,7 +3,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react"; 
 import LogoutButton from "./LogoutButton";
-import Link from "next/link"; // Recommended over <a> for internal links
+import Link from "next/link";
 
 const Navbar = () => {
   const router = useRouter();
@@ -42,8 +42,8 @@ const Navbar = () => {
           Network
         </a>
         <a href="/stats" className="hover:text-[#CAFF33] transition-colors">Stats</a>
-        <a href="/transaction" className="hover:text-[#CAFF33] transition-colors">Transactions</a>
         <a href="/service" className="hover:text-[#CAFF33] transition-colors">Request Service</a>
+        <a href="/transaction" className="hover:text-[#CAFF33] transition-colors">Transactions</a>
         {/* DASHBOARD - Only visible to Admins */}
         {session?.user?.role === "admin" && (
           <Link href="/admin" className="hover:text-[#CAFF33] transition-colors underline underline-offset-4 decoration-1">
