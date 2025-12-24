@@ -1,19 +1,15 @@
+# app/main.py
 from fastapi import FastAPI
 from app.api.routes import router
 
 app = FastAPI(
-    title="Visual Analytics ML Service",
-    description="ML orchestration service for Mule-Hunter",
+    title="Visual Analytics Service",
     version="1.0.0"
 )
 
-app.include_router(
-    router,
-    prefix="/visual-analytics/api",
-    tags=["visual-analytics"]
-)
+app.include_router(router, prefix="/visual-analytics/api")
 
 
 @app.get("/health")
-def health_check():
+def health():
     return {"status": "ok"}

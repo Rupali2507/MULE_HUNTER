@@ -1,5 +1,6 @@
 from fastapi import Header, HTTPException
 import os
+print("DEBUG INTERNAL_API_KEY =", os.getenv("INTERNAL_API_KEY"))
 
 INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY")
 

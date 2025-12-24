@@ -10,6 +10,10 @@ export default function FraudGraph3D({
   const fgRef = useRef();
   const containerRef = useRef();
 
+  const ZOOM_STEP = 120;
+  const MIN_Z = 150;
+  const MAX_Z = 1800;
+
   const [rawGraph, setRawGraph] = useState(null);
   const [showOnlyFraud, setShowOnlyFraud] = useState(false);
   const [activeNodeId, setActiveNodeId] = useState(null);
@@ -17,6 +21,58 @@ export default function FraudGraph3D({
     width: window.innerWidth,
     height: window.innerHeight,
   });
+  const [searchId, setSearchId] = useState("");
+  const [searchError, setSearchError] = useState("");
+  const handleSearch = () => {
+    if (!visibleGraph || !fgRef.current) return;
+
+    const node = visibleGraph.nodes.find(
+      (n) => String(n.id) === searchId.trim()
+    );
+
+    if (!node) {
+      setSearchError("Account not found in current view");
+      return;
+    }
+
+    setSearchError("");
+    setActiveNodeId(node.id);
+    onNodeSelect(node);
+
+    // Smooth camera focus
+    fgRef.current.cameraPosition(
+      {
+        x: node.x * 1.4,
+        y: node.y * 1.4,
+        z: node.z * 1.4 + 150,
+      },
+      node,
+      1200
+    );
+  };
+
+  const zoomCamera = (direction) => {
+    if (!fgRef.current) return;
+
+    const camera = fgRef.current.camera();
+    const controls = fgRef.current.controls();
+
+    const currentZ = camera.position.z;
+    let targetZ =
+      direction === "in" ? currentZ - ZOOM_STEP : currentZ + ZOOM_STEP;
+
+    targetZ = Math.max(MIN_Z, Math.min(MAX_Z, targetZ));
+
+    fgRef.current.cameraPosition(
+      {
+        x: camera.position.x,
+        y: camera.position.y,
+        z: targetZ,
+      },
+      controls.target,
+      500
+    );
+  };
 
   // LOAD GRAPH DATA (CORRECT + SAFE)
 
@@ -148,9 +204,31 @@ export default function FraudGraph3D({
           Red nodes indicate anomalous / high-risk accounts detected via EIF
         </p>
       </div>
+      {/* SEARCH BAR */}
+      <div className="absolute top-60 left-6 z-10 w-64 rounded-xl bg-black/70 p-3 backdrop-blur">
+        <input
+          type="text"
+          placeholder="Search Account ID"
+          value={searchId}
+          onChange={(e) => setSearchId(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+          className="w-full rounded bg-gray-900 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-red-500"
+        />
+
+        <button
+          onClick={handleSearch}
+          className="mt-2 w-full rounded bg-red-600 py-1.5 text-xs font-semibold hover:bg-red-700"
+        >
+          Focus Node
+        </button>
+
+        {searchError && (
+          <p className="mt-2 text-xs text-red-400">{searchError}</p>
+        )}
+      </div>
 
       {/* LEGEND + FILTER */}
-      <div className="absolute top-24 left-6 z-10 rounded-xl bg-black/70 p-4 text-sm text-gray-200 backdrop-blur">
+      <div className="absolute top-20 left-6 z-10 rounded-xl bg-black/70 p-4 text-sm text-gray-200 backdrop-blur">
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
@@ -193,7 +271,9 @@ export default function FraudGraph3D({
             setActiveNodeId(node.id);
           }}
           nodeThreeObject={(node) => {
-            const isSelected = selectedNode?.id === node.id;
+            const isSelected =
+              selectedNode?.id === node.id || activeNodeId === node.id;
+
             const isAlerted = alertedNodeId === node.id;
 
             const geometry = new THREE.SphereGeometry(
@@ -244,6 +324,27 @@ Status: ${n.is_anomalous ? "Fraud" : "Normal"}`
           linkDirectionalParticleWidth={1.6}
           linkDirectionalParticleSpeed={0.005}
         />
+      </div>
+
+      {/* ZOOM CONTROLS */}
+      <div className="absolute bottom-24 left-6 z-10 flex flex-col gap-2">
+        <button
+          onClick={() => zoomCamera("in")}
+          title="Zoom In"
+          aria-label="Zoom In"
+          className="flex h-10 w-10 items-center justify-center rounded-2xl text-xs bg-black/70  text-white backdrop-blur hover:bg-black active:scale-95"
+        >
+          zoom in
+        </button>
+
+        <button
+          onClick={() => zoomCamera("out")}
+          title="Zoom Out"
+          aria-label="Zoom Out"
+          className="flex h-10 w-10 items-center justify-center rounded-2xl text-sm bg-black/70  text-white backdrop-blur hover:bg-black active:scale-95"
+        >
+          zoom out
+        </button>
       </div>
 
       {/* FOOTER */}

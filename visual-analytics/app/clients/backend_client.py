@@ -15,7 +15,7 @@ def _check_response(resp):
 
 def get_nodes_enriched():
     resp = requests.get(
-        f"{BACKEND_BASE_URL}/nodes/enriched",
+        f"{BACKEND_BASE_URL}/backend/api/nodes/enriched",
         timeout=REQUEST_TIMEOUT
     )
     _check_response(resp)
@@ -28,25 +28,25 @@ def get_nodes_enriched():
 
 def post_anomaly_scores(data):
     resp = requests.post(
-        f"{BACKEND_BASE_URL}/visual/anomaly-scores/batch",
+        f"{BACKEND_BASE_URL}/backend/api/visual/anomaly-scores/batch",
         json=data,
         timeout=REQUEST_TIMEOUT
     )
     _check_response(resp)
 
 
-def post_nodes_scored(data):
-    resp = requests.post(
-        f"{BACKEND_BASE_URL}/nodes/scored/batch",
-        json=data,
-        timeout=REQUEST_TIMEOUT
-    )
-    _check_response(resp)
+# def post_nodes_scored(data):
+#     resp = requests.post(
+#         f"{BACKEND_BASE_URL}/nodes/scored/batch",
+#         json=data,
+#         timeout=REQUEST_TIMEOUT
+#     )
+#     _check_response(resp)
 
 
 def post_shap_explanations(data):
     resp = requests.post(
-        f"{BACKEND_BASE_URL}/visual/shap-explanations/batch",
+        f"{BACKEND_BASE_URL}/backend/api/visual/shap-explanations/batch",
         json=data,
         timeout=REQUEST_TIMEOUT
     )
@@ -55,17 +55,17 @@ def post_shap_explanations(data):
 
 def post_fraud_explanations(data):
     resp = requests.post(
-        f"{BACKEND_BASE_URL}/visual/fraud-explanations/batch",
+        f"{BACKEND_BASE_URL}/backend/api/visual/fraud-explanations/batch",
         json=data,
         timeout=REQUEST_TIMEOUT
     )
     _check_response(resp)
 
 
-def post_nodes_viz(data):
-    resp = requests.post(
-        f"{BACKEND_BASE_URL}/visual/nodes-viz/batch",
-        json=data,
-        timeout=REQUEST_TIMEOUT
-    )
-    _check_response(resp)
+# def post_nodes_viz(data):
+#     resp = requests.post(
+#         f"{BACKEND_BASE_URL}/visual/nodes-viz/batch",
+#         json=data,
+#         timeout=REQUEST_TIMEOUT
+#     )
+#     _check_response(resp)
