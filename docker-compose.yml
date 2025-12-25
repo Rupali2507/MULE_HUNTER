@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # -------------------------------------------------------
+  # SERVICE 1: AI INTELLIGENCE ENGINE (Muskan)
+  # Role: Fraud Detection, Graph Neural Networks, ID Mapping
+  # -------------------------------------------------------
+  ai-engine:
+    build: 
+      context: ./ai-engine
+      dockerfile: Dockerfile
+    container_name: mule-hunter-ai
+    ports:
+      - "8000:8000"
+    volumes:
+      # [CRITICAL] Volume Mount: Maps local shared-data to container.
+      # This allows the Python service to read 'nodes.csv' to build the ID Map.
+      - ./shared-data:/shared-data
+    networks:
+      - mule-net
+
+  # -------------------------------------------------------
+  # SERVICE 2: BANKING TRANSACTION CORE (Prisha)
+  # Role: Transaction Processing, Database I/O, AI Orchestration
+  # -------------------------------------------------------
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mule-hunter-backend
+    ports:
+      - "8080:8080"
+    environment:
+      # Profile Configuration
+      SPRING_PROFILES_ACTIVE: docker
+      # Database Connection String (MongoDB Atlas)
+      SPRING_DATA_MONGODB_URI: mongodb+srv://prisha:Prisha123@cluster0.pjwljsk.mongodb.net/test
+      # AI Service Endpoint (Internal Docker Host Networking)
+      AI_SERVICE_URL: "http://host.docker.internal:8000"
+    depends_on:
+      - ai-engine # Ensures AI is live before Backend starts
+    networks:
+      - mule-net
+
+# -------------------------------------------------------
+# NETWORK ARCHITECTURE
+# -------------------------------------------------------
+networks:
+  mule-net:
+    driver: bridge
