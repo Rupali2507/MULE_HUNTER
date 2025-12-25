@@ -8,3 +8,4 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       SPRING_DATA_MONGODB_URI: mongodb+srv://prisha:Prisha123@cluster0.pjwljsk.mongodb.net/test
+      AI_SERVICE_URL: "http://host.docker.internal:8000"

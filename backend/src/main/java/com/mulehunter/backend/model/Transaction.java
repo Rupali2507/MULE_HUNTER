@@ -21,6 +21,9 @@ public class Transaction {
     
     private boolean suspectedFraud;
 
+    private Double riskScore; 
+    private String verdict;
+
     public Transaction() {}
 
     public static Transaction from(TransactionRequest request) {
@@ -29,6 +32,7 @@ public class Transaction {
         tx.targetAccount = request.getTargetAccount();
         tx.amount = request.getAmount();
         tx.suspectedFraud = false;
+        // riskScore and verdict are null initially; we fill them after AI responds
         return tx;
     }
 
@@ -54,5 +58,21 @@ public class Transaction {
 
     public void setSuspectedFraud(boolean suspectedFraud) {
         this.suspectedFraud = suspectedFraud;
+    }
+
+    public Double getRiskScore() {
+        return riskScore;
+    }
+
+    public void setRiskScore(Double riskScore) {
+        this.riskScore = riskScore;
+    }
+
+    public String getVerdict() {
+        return verdict;
+    }
+
+    public void setVerdict(String verdict) {
+        this.verdict = verdict;
     }
 }
