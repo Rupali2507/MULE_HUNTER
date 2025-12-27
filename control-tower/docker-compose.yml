@@ -21,6 +21,7 @@ services:
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXTAUTH_URL=${NEXTAUTH_URL}
       - JWT_SECRET=${JWT_SECRET}
+      - AUTH_TRUST_HOST=true
       - NODE_ENV=production
     restart: always
 
