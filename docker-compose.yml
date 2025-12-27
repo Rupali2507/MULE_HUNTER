@@ -1,10 +1,8 @@
 version: '3.8'
 
 services:
-  # -------------------------------------------------------
-  # SERVICE 1: AI INTELLIGENCE ENGINE (Muskan)
+  # SERVICE 1: AI INTELLIGENCE ENGINE (Muskan) 
   # Role: Fraud Detection, Graph Neural Networks, ID Mapping
-  # -------------------------------------------------------
   ai-engine:
     build: 
       context: ./ai-engine
@@ -13,16 +11,13 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # [CRITICAL] Volume Mount: Maps local shared-data to container.
-      # This allows the Python service to read 'nodes.csv' to build the ID Map.
+      # Maps local shared data so AI can read nodes.csv
       - ./shared-data:/shared-data
     networks:
       - mule-net
 
-  # -------------------------------------------------------
-  # SERVICE 2: BANKING TRANSACTION CORE (Prisha)
-  # Role: Transaction Processing, Database I/O, AI Orchestration
-  # -------------------------------------------------------
+  
+  # SERVICE 2: BANKING TRANSACTION CORE (Prisha) 
   backend:
     build: 
       context: ./backend
@@ -31,20 +26,52 @@ services:
     ports:
       - "8080:8080"
     environment:
-      # Profile Configuration
       SPRING_PROFILES_ACTIVE: docker
-      # Database Connection String (MongoDB Atlas)
-      SPRING_DATA_MONGODB_URI: mongodb+srv://prisha:Prisha123@cluster0.pjwljsk.mongodb.net/test
-      # AI Service Endpoint (Internal Docker Host Networking)
-      AI_SERVICE_URL: "http://host.docker.internal:8000"
+      
+      SPRING_DATA_MONGODB_URI: ${SPRING_DATA_MONGODB_URI}
+      VISUAL_INTERNAL_API_KEY: ${VISUAL_INTERNAL_API_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      
+      AI_SERVICE_URL: ${AI_SERVICE_URL}
+      
     depends_on:
-      - ai-engine # Ensures AI is live before Backend starts
+      - ai-engine
     networks:
       - mule-net
 
-# -------------------------------------------------------
-# NETWORK ARCHITECTURE
-# -------------------------------------------------------
+  # SERVICE 3: CONTROL TOWER (Frontend) 
+  # Role: Dashboard, Visuals, User Interaction
+  control-tower:
+    image: control-tower:latest
+    container_name: control-tower-app
+    build:
+      context: ./control-tower  # <--- Points to your subfolder
+      dockerfile: Dockerfile
+      args:
+        # Build-time variables for Next.js
+        - MONGODB_URI=${MONGODB_URI}
+        - AUTH_SECRET=${AUTH_SECRET}
+        - AUTH_URL=${AUTH_URL}
+        - JWT_SECRET=${JWT_SECRET}
+        - NEXT_PUBLIC_EMAILJS_SERVICE_ID=${NEXT_PUBLIC_EMAILJS_SERVICE_ID}
+        - NEXT_PUBLIC_EMAILJS_TEMPLATE_ID=${NEXT_PUBLIC_EMAILJS_TEMPLATE_ID}
+        - NEXT_PUBLIC_EMAILJS_PUBLIC_KEY=${NEXT_PUBLIC_EMAILJS_PUBLIC_KEY}
+        - NEXT_PUBLIC_API_URL=http://localhost:8080
+    ports:
+      - "3000:3000"
+    environment:
+      # Run-time variables
+      - MONGODB_URI=${MONGODB_URI}
+      - AUTH_SECRET=${AUTH_SECRET}
+      - AUTH_URL=${AUTH_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - NODE_ENV=production
+    depends_on:
+      - backend
+    networks:
+      - mule-net
+
+# SHARED NETWORK
 networks:
   mule-net:
     driver: bridge

@@ -2,6 +2,7 @@ package com.mulehunter.backend.controller;
 
 import java.util.List;
 
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,7 +19,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @RestController
-@RequestMapping("/backend/api/visual/anomaly-scores")
+@RequestMapping("/api") 
+@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true") 
 public class AnomalyScoreController {
 
     private final AnomalyScoreService service;
@@ -29,16 +31,16 @@ public class AnomalyScoreController {
         this.repository = repository;
     }
 
-    @PostMapping("/batch")
-    public Mono<String> saveBatch(@RequestBody List<AnomalyScoreDTO> payload) {
 
+    @PostMapping("/visual/anomaly-scores/batch")
+    public Mono<String> saveBatch(@RequestBody List<AnomalyScoreDTO> payload) {
         return service.saveBatch(Flux.fromIterable(payload))
                 .thenReturn("Anomaly scores stored successfully");
     }
 
-    @GetMapping("/backend/api/visual/anomaly-scores/{nodeId}")
+
+    @GetMapping("/risk-scores/{nodeId}")
     public Mono<AnomalyScore> getLatest(@PathVariable Long nodeId) {
         return repository.findByNodeId(nodeId);
     }
-
 }

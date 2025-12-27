@@ -17,31 +17,37 @@ export default function FakeTransactionPage() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const sendTransaction = async () => {
+const sendTransaction = async () => {
     setLoading(true);
     setResult(null);
 
-    const payload = {
-      source: form.source,
-      target: form.target,
-      amount: Number(form.amount),
-      timestamp: Date.now(),
+    const transactionData = {
+      sourceAccount: form.source,
+      targetAccount: form.target,
+      amount: Number(form.amount)
     };
 
     try {
-      // 1️⃣ Send transaction (graph edge)
-      await fetch("http://localhost:8080/api/transaction", {
+      const txResponse = await fetch("http://localhost:8080/api/transactions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(transactionData),
       });
 
-      const res = await fetch(`/backend/api/risk-scores/${form.source}`);
-      const data = await res.json();
+      if (!txResponse.ok) throw new Error("Transaction Failed");
 
-      setResult(data);
-    } catch (err) {
-      console.error(err);
+      const data = await txResponse.json();
+      console.log("Full Backend Response:", data); 
+
+      setResult({
+        risk_score: data.riskScore || 0,
+        
+        reasons: [data.verdict || "Processed by AI Engine"]
+      });
+
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Transaction Failed! Check console for details.");
     } finally {
       setLoading(false);
     }
