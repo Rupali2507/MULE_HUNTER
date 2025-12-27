@@ -6,7 +6,7 @@ import os
 load_dotenv(dotenv_path=".env")
 
 INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY")
-print(f"INTERNAL_API_KEY: {INTERNAL_API_KEY}")
+# print(f"INTERNAL_API_KEY: {INTERNAL_API_KEY}")
 
 if not INTERNAL_API_KEY:
     raise RuntimeError("INTERNAL_API_KEY is not set in environment")

@@ -20,7 +20,7 @@ export default function VisualAnalyticsCard({
   }
 
   return (
-    <div className="p-4 bg-gray-900 rounded-xl border border-gray-800 space-y-4">
+    <div className="h-full p-4 bg-gray-900 rounded-xl border border-gray-800 flex flex-col">
       {/* ================= HEADER ================= */}
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-orange-400">
@@ -40,12 +40,12 @@ export default function VisualAnalyticsCard({
         </span>
       </div>
 
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-gray-400 mt-1">
         Graph-based · Population-aware · Explainable (EIF + SHAP)
       </p>
 
-      {/* ================= STAGE-AWARE EVENTS ================= */}
-      <div className="space-y-2 text-sm text-gray-300">
+      {/* ================= SUMMARY (FIXED) ================= */}
+      <div className="mt-3 space-y-2 text-sm text-gray-300">
         {vaEvents.map((e, i) => (
           <div key={i}>
             {e.stage === "population_loaded" && (
@@ -90,23 +90,28 @@ export default function VisualAnalyticsCard({
 
             {e.stage === "unsupervised_completed" && (
               <div className="mt-2 font-semibold text-green-400">
-                 Visual-Analytics completed
+                ✅ Visual-Analytics completed
               </div>
             )}
 
             {e.stage === "unsupervised_failed" && (
               <div className="text-red-500">
-                 Visual-Analytics failed
+                ❌ Visual-Analytics failed
               </div>
             )}
           </div>
         ))}
       </div>
 
-      {/* ================= LIVE RAW EVENT STREAM ================= */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <h3 className="text-[#caff33] font-semibold mb-3">
+      {/* ================= LIVE STREAM (SCROLLABLE) ================= */}
+      <div className="mt-4 flex-1 bg-[#0f172a] border border-gray-700 rounded-xl p-3 overflow-y-auto">
+        <h3 className="text-[#caff33] font-semibold mb-2 flex items-center gap-2">
           🧠 Visual ML (Live)
+          {vaStatus === "running" && (
+            <span className="text-xs text-yellow-400 animate-pulse">
+              ● streaming
+            </span>
+          )}
         </h3>
 
         {vaEvents.length === 0 ? (
@@ -114,14 +119,15 @@ export default function VisualAnalyticsCard({
             Waiting for ML events…
           </p>
         ) : (
-          <ul className="space-y-2 text-sm">
+          <ul className="space-y-2 text-xs font-mono text-gray-300">
             {vaEvents.map((e, i) => (
-              <li key={i} className="text-gray-300">
-                <b>{e.stage || e.event}</b>{" "}
-                —{" "}
-                {typeof e.data === "string"
-                  ? e.data
-                  : JSON.stringify(e.data)}
+              <li key={i} className="bg-black/40 rounded-md p-2">
+                <span className="text-blue-400">
+                  {e.stage || e.event}
+                </span>
+                <div className="text-gray-400 break-words">
+                  {JSON.stringify(e.data)}
+                </div>
               </li>
             ))}
           </ul>
@@ -129,7 +135,7 @@ export default function VisualAnalyticsCard({
       </div>
 
       {vaStatus === "running" && (
-        <div className="text-xs text-gray-500 italic">
+        <div className="mt-2 text-xs text-gray-500 italic">
           Analyzing behavioral patterns…
         </div>
       )}

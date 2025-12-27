@@ -203,7 +203,7 @@ export default function FakeTransactionPage() {
           </div>
 
           {/* RIGHT */}
-          <div className="border border-gray-800 rounded-2xl p-6 bg-[#0A0A0A] flex flex-col">
+          <div className="border border-gray-800 rounded-2xl p-6 bg-[#0A0A0A] flex flex-col h-full">
             <h2 className="text-xl font-bold mb-4">
               Investigation Dashboard
             </h2>
