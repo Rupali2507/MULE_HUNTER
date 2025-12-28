@@ -31,8 +31,7 @@ public class TransactionService {
             TransactionRepository repository,
             NodeEnrichedService nodeEnrichedService,
             
-            // Inject URL from environment/properties. Default to localhost for teammates.
-            @Value("${ai.service.url:http://localhost:8000}") String aiServiceUrl,
+            @Value("${ai.service.url:http://localhost:8001}") String aiServiceUrl,
             @Value("${visual.service.url:http://localhost:8000}") String visualServiceUrl
     ) {
         this.repository = repository;
