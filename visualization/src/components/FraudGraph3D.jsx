@@ -10,7 +10,7 @@ export default function FraudGraph3D({
 }) {
   const fgRef = useRef();
   const containerRef = useRef();
-
+  const API_BASE = import.meta.env.VITE_API_BASE_URL;
   const ZOOM_STEP = 120;
   const MIN_Z = 150;
   const MAX_Z = 1800;
@@ -89,7 +89,7 @@ export default function FraudGraph3D({
 
     async function loadGraph() {
       try {
-        const res = await fetch(`http://51.20.82.63:8080/api/graph`, {
+        const res = await fetch(`${API_BASE}/api/graph`, {
           signal: controller.signal,
           /*headers: {
             Authorization: `Bearer ${token}`,

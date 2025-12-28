@@ -5,11 +5,11 @@ import NodeInspector from "./components/NodeInspector";
 function App() {
   const [selectedNode, setSelectedNode] = useState(null);
   const [token, setToken] = useState(null);
-
+const API = import.meta.env.VITE_CONTROL_TOWER_API_URL;
   const [loading, setLoading] = useState(true);
 
   // async function getRoleToken() {
-  //   const res = await fetch("http://13.48.249.157:3000/api/user/role", {
+  //   const res = await fetch(`${API}/api/user/role`, {
   //     credentials: "include",
   //   });
 

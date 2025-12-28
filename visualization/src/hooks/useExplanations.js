@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 export default function useExplanations(nodeId) {
   const [explanation, setExplanation] = useState(null);
   const [loading, setLoading] = useState(false);
-
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
   useEffect(() => {
     if (nodeId === null || nodeId === undefined) {
       setExplanation(null);
@@ -17,7 +17,7 @@ export default function useExplanations(nodeId) {
         setLoading(true);
 
         const res = await fetch(
-          `http://51.20.82.63:8080/api/graph/node/${nodeId}`,
+          `${API_BASE}/api/graph/node/${nodeId}`,
           { signal: controller.signal }
         );
 
