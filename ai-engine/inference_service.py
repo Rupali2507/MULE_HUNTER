@@ -1,7 +1,7 @@
 """
-Mule Hunter AI Service - Production Grade
+Mule Hunter AI Service - Production Grade with Auto-Training
 Entry point for Graph Neural Network (GNN) Inference.
-Features: Auto-Initialization, Dynamic Feature Engineering, and Real-time Risk Scoring.
+Features: Auto-Initialization, Auto-Training, Dynamic Feature Engineering, and Real-time Risk Scoring.
 """
 
 import os
@@ -35,7 +35,6 @@ except ImportError:
     logger.warning("Faker not found; random data will be used without localized names.")
 
 # --- CONFIGURATION & PATHS ---
-# Shared data directory for persistence across container restarts
 BASE_DIR = os.path.dirname(__file__)
 SHARED_DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "shared-data"))
 os.makedirs(SHARED_DATA_DIR, exist_ok=True)
@@ -85,35 +84,7 @@ id_map = {}
 reverse_id_map = {}
 node_features_df = None 
 
-# --- INTERNAL LOGIC: BRAIN LOADING ---
-def load_assets_into_memory():
-    """Loads trained weights and graph data into RAM for inference."""
-    global model, graph_data, id_map, reverse_id_map, node_features_df
-    
-    if os.path.exists(MODEL_PATH) and os.path.exists(DATA_PATH):
-        try:
-            logger.info("⚙️ Loading Neural Network assets into memory...")
-            graph_data = torch.load(DATA_PATH, map_location='cpu', weights_only=False)
-            
-            node_features_df = pd.read_csv(NODES_CSV_PATH)
-            node_features_df['node_id'] = node_features_df['node_id'].astype(str)
-            
-            # Efficient O(1) Lookups
-            id_map = {row['node_id']: idx for idx, row in node_features_df.iterrows()}
-            reverse_id_map = {idx: row['node_id'] for idx, row in node_features_df.iterrows()}
-            
-            # Reconstruct Model Architecture
-            model = MuleSAGE(in_channels=5, hidden_channels=16, out_channels=2)
-            model.load_state_dict(torch.load(MODEL_PATH, map_location='cpu'))
-            model.eval()
-            
-            logger.info(f"✅ SYSTEM READY: Scaled to {len(id_map)} entities.")
-        except Exception as e:
-            logger.error(f"❌ Failed to load AI brain: {str(e)}")
-    else:
-        logger.error("🚫 Missing model assets. System requires initialization.")
-
-# --- INTERNAL LOGIC: PIPELINE OPERATIONS ---
+# --- INTERNAL LOGIC: DATA GENERATION ---
 def run_internal_generator():
     """Simulates a synthetic financial network with injected mule rings."""
     logger.info("📊 GENERATOR: Constructing synthetic financial network...")
@@ -158,45 +129,118 @@ def run_internal_generator():
     cols = ["node_id", "account_age_days", "balance", "in_out_ratio", "pagerank", "tx_velocity", "is_fraud"]
     df_nodes[cols].to_csv(NODES_CSV_PATH, index=False)
     
-    edge_data = [{"source": str(u), "target": str(v)} for u, v in G.edges()]
+    edge_data = [{"source": str(u), "target": str(v), "amount": float(random.randint(100, 5000)), 
+                  "timestamp": pd.Timestamp.now().isoformat()} for u, v in G.edges()]
     pd.DataFrame(edge_data).to_csv(EDGES_CSV_PATH, index=False)
     logger.info("💾 Data generation persisted to shared-data.")
 
+# --- INTERNAL LOGIC: MODEL TRAINING ---
 def run_internal_trainer():
     """Trains the GraphSAGE model on the generated topology."""
     logger.info("🧠 TRAINER: Optimizing Neural Weights...")
-    df_nodes = pd.read_csv(NODES_CSV_PATH)
-    df_edges = pd.read_csv(EDGES_CSV_PATH)
+    
+    try:
+        df_nodes = pd.read_csv(NODES_CSV_PATH)
+        df_edges = pd.read_csv(EDGES_CSV_PATH)
+    except FileNotFoundError as e:
+        logger.error(f"❌ Data files not found: {e}")
+        raise
 
+    # Create node mapping
     node_mapping = {str(id): idx for idx, id in enumerate(df_nodes['node_id'].astype(str))}
+    
+    # Build edge index
     src = df_edges['source'].astype(str).map(node_mapping).values
     dst = df_edges['target'].astype(str).map(node_mapping).values
     
     mask = ~np.isnan(src) & ~np.isnan(dst)
     edge_index = torch.tensor([src[mask], dst[mask]], dtype=torch.long)
 
+    # Prepare features and labels
     feature_cols = ["account_age_days", "balance", "in_out_ratio", "pagerank", "tx_velocity"]
     x = torch.tensor(df_nodes[feature_cols].values, dtype=torch.float)
     y = torch.tensor(df_nodes['is_fraud'].values, dtype=torch.long)
 
+    # Create PyG Data object
     data = Data(x=x, edge_index=edge_index, y=y)
     torch.save(data, DATA_PATH)
+    logger.info(f"📦 Processed graph saved to {DATA_PATH}")
 
+    # Initialize and train model
     local_model = MuleSAGE(in_channels=5, hidden_channels=16, out_channels=2)
-    optimizer = torch.optim.Adam(local_model.parameters(), lr=0.01)
+    optimizer = torch.optim.Adam(local_model.parameters(), lr=0.01, weight_decay=5e-4)
     
     local_model.train()
-    for _ in range(100):
+    logger.info("🏋️ Training started (100 epochs)...")
+    for epoch in range(100):
         optimizer.zero_grad()
         out = local_model(data.x, data.edge_index)
         loss = F.nll_loss(out, data.y)
         loss.backward()
         optimizer.step()
+        
+        if epoch % 20 == 0:
+            logger.info(f"   Epoch {epoch}: Loss {loss.item():.4f}")
 
     torch.save(local_model.state_dict(), MODEL_PATH)
-    logger.info("🏆 Model training complete. State dictionary saved.")
+    logger.info(f"🏆 Model training complete. Weights saved to {MODEL_PATH}")
 
-# --- LIFESPAN MANAGER (Auto-Init on Startup) ---
+# --- INTERNAL LOGIC: ASSET LOADING ---
+def load_assets_into_memory():
+    """Loads trained weights and graph data into RAM for inference."""
+    global model, graph_data, id_map, reverse_id_map, node_features_df
+    
+    try:
+        logger.info("⚙️ Loading Neural Network assets into memory...")
+        graph_data = torch.load(DATA_PATH, map_location='cpu', weights_only=False)
+        
+        node_features_df = pd.read_csv(NODES_CSV_PATH)
+        node_features_df['node_id'] = node_features_df['node_id'].astype(str)
+        
+        # Efficient O(1) Lookups
+        id_map = {row['node_id']: idx for idx, row in node_features_df.iterrows()}
+        reverse_id_map = {idx: row['node_id'] for idx, row in node_features_df.iterrows()}
+        
+        # Reconstruct Model Architecture
+        model = MuleSAGE(in_channels=5, hidden_channels=16, out_channels=2)
+        model.load_state_dict(torch.load(MODEL_PATH, map_location='cpu'))
+        model.eval()
+        
+        logger.info(f"✅ SYSTEM READY: Scaled to {len(id_map)} entities.")
+    except Exception as e:
+        logger.error(f"❌ Failed to load AI brain: {str(e)}")
+        raise
+
+# --- AUTO-INITIALIZATION LOGIC ---
+def auto_initialize_system():
+    """
+    Automatically initializes the system on startup:
+    1. Checks if data and model exist
+    2. Generates data if missing
+    3. Trains model if missing
+    4. Loads everything into memory
+    """
+    logger.info("🔍 Checking system state...")
+    
+    data_exists = os.path.exists(NODES_CSV_PATH) and os.path.exists(EDGES_CSV_PATH)
+    model_exists = os.path.exists(MODEL_PATH) and os.path.exists(DATA_PATH)
+    
+    if not data_exists:
+        logger.warning("⚠️ No data detected. Generating synthetic dataset...")
+        run_internal_generator()
+        data_exists = True
+    
+    if not model_exists:
+        logger.warning("⚠️ No model detected. Training from scratch...")
+        if not data_exists:
+            logger.error("❌ Cannot train without data!")
+            raise RuntimeError("Data generation failed")
+        run_internal_trainer()
+    
+    # Load everything into memory
+    load_assets_into_memory()
+
+# --- LIFESPAN MANAGER ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -205,29 +249,38 @@ async def lifespan(app: FastAPI):
     """
     logger.info("🚀 AI Service Initialization Sequence Started...")
     
-    if not os.path.exists(MODEL_PATH):
-        logger.warning("⚠️ No model detected. Running first-time setup...")
-        run_internal_generator()
-        run_internal_trainer()
-    else:
-        logger.info("📂 Persistence found. Skipping generator.")
-
-    load_assets_into_memory()
+    try:
+        auto_initialize_system()
+    except Exception as e:
+        logger.error(f"💥 Initialization failed: {str(e)}")
+        raise
+    
     yield
     logger.info("🛑 AI Service shutting down safely.")
 
 # --- FASTAPI APP INITIALIZATION ---
 app = FastAPI(
     title="Mule Hunter AI Service",
-    version="Gold-V1",
+    version="Gold-V2-AutoTrain",
     lifespan=lifespan
 )
 
 # --- API ENDPOINTS ---
 
+@app.get("/health", tags=["System"])
+async def health_check():
+    """Health check endpoint."""
+    return {
+        "status": "HEALTHY" if model is not None else "INITIALIZING",
+        "model_loaded": model is not None,
+        "nodes_count": len(id_map) if id_map else 0,
+        "version": "Gold-V2-AutoTrain"
+    }
+
 @app.post("/initialize-system", tags=["System Maintenance"])
 async def trigger_full_reinit():
     """Manually forces a full system re-initialization (Generator + Trainer)."""
+    logger.info("🔄 Manual re-initialization triggered...")
     run_internal_generator()
     run_internal_trainer()
     load_assets_into_memory()
@@ -295,7 +348,7 @@ def analyze_transaction(tx: TransactionRequest):
         "node_id": tx.source_id,
         "risk_score": round(fraud_risk, 4),
         "verdict": verdict,
-        "model_version": "MuleSAGE-5Feat",
+        "model_version": "MuleSAGE-5Feat-AutoTrained",
         "out_degree": out_degree,
         "risk_ratio": round(risk_ratio_ui, 2),
         "population_size": f"{len(id_map)} Nodes",
