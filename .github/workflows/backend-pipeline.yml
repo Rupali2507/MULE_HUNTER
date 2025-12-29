@@ -1,25 +1,31 @@
-name: Auto Deploy to EC2
+name: Backend Deploy to EC2
 
 on:
   push:
     branches:
       - main
+    paths:
+      - "backend/**"
+      - "docker-compose.yml"
+      - ".github/workflows/backend-pipeline.yml"
 
 jobs:
-  ec2-deploy:
+  backend-deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: SSH into EC2 and deploy
+      - name: Deploy backend on EC2
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_KEY }}
           script: |
+            set -e
             cd ~/MULE_HUNTER
             git pull origin main
+            docker-compose down
             docker-compose up -d --build
