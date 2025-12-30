@@ -56,6 +56,8 @@ jobs:
             # 2. Login to Docker Hub
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
 
+            docker rm -f control-tower-app || true
+
             # 3. Create/Update docker-compose.yml
             # Notice the image now uses the specific run number tag
             cat <<'EOF' > docker-compose.yml
