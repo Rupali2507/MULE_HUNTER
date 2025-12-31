@@ -535,9 +535,8 @@ curl http://localhost:8082/api/health/ai
 
 **⭐ Star this repo if you found it helpful! ⭐**
 
-**Made with ❤️ by the Mule Hunter Team**
+**Made with ❤️ by Team Alertix**
 
-[🐛 Report Bug](https://github.com/yourusername/mule-hunter/issues) • [✨ Request Feature](https://github.com/yourusername/mule-hunter/issues)
 
 </div>
 
