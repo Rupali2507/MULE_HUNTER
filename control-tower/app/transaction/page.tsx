@@ -5,6 +5,13 @@ import Footer from "../components/Footer";
 import Navbar from "../components/Navbar";
 import VisualAnalyticsCard from "../components/VisualAnalyticsCard";
 
+
+const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL!;
+
+if (!BACKEND_BASE_URL) {
+  throw new Error("NEXT_PUBLIC_BACKEND_BASE_URL is not defined");
+}
+
 type ActiveTab = "unsupervised" | "ja3" | "supervised";
 
 interface AISystemStatus {
@@ -40,7 +47,10 @@ export default function FakeTransactionPage() {
     
     const checkAiHealth = async () => {
       try {
-        const response = await fetch("http://13.60.91.248:8082/api/health/ai");
+        const response = await fetch(
+  `${BACKEND_BASE_URL}/api/health/ai`
+);
+
         const data = await response.json();
         setAiHealth(data);
         setAiChecking(false);
@@ -88,11 +98,15 @@ export default function FakeTransactionPage() {
 
     try {
       // ================= TRANSACTION (POST to Java -> Python) =================
-      const txResponse = await fetch("http://13.60.91.248:8082/api/transactions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(transactionData),
-      });
+      const txResponse = await fetch(
+        `${BACKEND_BASE_URL}/api/transactions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(transactionData),
+        }
+      );
+
 
       if (!txResponse.ok) {
         throw new Error("Transaction API failed");
@@ -136,8 +150,11 @@ export default function FakeTransactionPage() {
       setActiveTab("unsupervised"); 
 
       const es = new EventSource(
-        `http://13.60.91.248:8082/api/visual/stream/unsupervised?transactionId=${transactionId}&nodeId=${form.source}`
+        `${BACKEND_BASE_URL}/api/visual/stream/unsupervised` +
+        `?transactionId=${transactionId}&nodeId=${form.source}`
       );
+
+
 
 
       const handleEvent = (event: MessageEvent) => {
