@@ -62,7 +62,7 @@ export default function FraudGraph3D({
   alertedNodeId,
 }: FraudGraph3DProps) {
   const fgRef = useRef<any>(null);
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
   const [ForceGraph3D, setForceGraph3D] = useState<React.ComponentType<any> | null>(null);
   const [mounted, setMounted] = useState<boolean>(false);
