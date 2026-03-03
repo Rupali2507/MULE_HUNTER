@@ -1,20 +1,73 @@
-import { useState, useEffect } from "react";
-import useExplanations from "../hooks/useExplanations";
+"use client";
 
-export default function NodeInspector({ node, onClose }) {
-  const [aiText, setAiText] = useState(null);
-  const [loadingAI, setLoadingAI] = useState(false);
-  const [closing, setClosing] = useState(false);
-  const [activeSlide, setActiveSlide] = useState("shap");
+import { useState } from "react";
+import useExplanations from "../../hooks/useExplanations";
+
+/* ================= TYPES ================= */
+
+interface GraphNode {
+  id: string | number;
+  is_anomalous?: boolean | number;
+  anomalyScore?: number;   
+  volume?: number;
+  size?: number;
+}
+
+interface NodeInspectorProps {
+  node: GraphNode | null;
+  onClose: () => void;
+}
+
+interface SectionProps {
+  title: string;
+  children: React.ReactNode;
+}
+
+interface MetricProps {
+  label: string;
+  value: string | number;
+  highlight?: boolean;
+  color?: "red" | "green";
+}
+
+interface TabButtonProps {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}
+
+interface ShapSlideProps {
+  reasons: string[];
+  loading: boolean;
+  isAnomalous: boolean;
+}
+
+interface AISlideProps {
+  aiText: string | null;
+  loading: boolean;
+  onGenerate: () => void;
+}
+
+/* ================= COMPONENT ================= */
+
+export default function NodeInspector({
+  node,
+  onClose,
+}: NodeInspectorProps) {
+  const [aiText, setAiText] = useState<string | null>(null);
+  const [loadingAI, setLoadingAI] = useState<boolean>(false);
+  const [closing, setClosing] = useState<boolean>(false);
+  const [activeSlide, setActiveSlide] = useState<"shap" | "ai">("shap");
 
   const nodeId = node ? Number(node.id) : null;
   const { explanation, loading } = useExplanations(nodeId);
 
   if (!node) return null;
 
-  const isAnomalous = node.is_anomalous === true || node.is_anomalous === 1;
+  const isAnomalous =
+    node.is_anomalous === true || node.is_anomalous === 1;
 
-  const reasons = explanation?.reasons ?? [];
+  const reasons: string[] = explanation?.reasons ?? [];
 
   const generateAIExplanation = () => {
     setLoadingAI(true);
@@ -53,7 +106,11 @@ to anomalous accounts. Rapid inflow and outflow patterns indicate potential mule
       <div className="flex justify-between items-center px-5">
         <h2 className="text-lg font-semibold">
           Node Forensics:{" "}
-          <span className={isAnomalous ? "text-red-400" : "text-green-400"}>
+          <span
+            className={
+              isAnomalous ? "text-red-400" : "text-green-400"
+            }
+          >
             ACC{node.id}
           </span>
         </h2>
@@ -72,7 +129,14 @@ to anomalous accounts. Rapid inflow and outflow patterns indicate potential mule
           value={isAnomalous ? "Anomalous" : "Normal"}
           highlight={isAnomalous}
         />
-        <Metric label="Risk Score" value={(node.height * 100).toFixed(1)} />
+       <Metric
+          label="Risk Score"
+          value={
+            node.anomalyScore !== undefined
+              ? Math.abs(node.anomalyScore * 100).toFixed(1)
+              : "N/A"
+          }
+        />
       </Section>
 
       {/* METRICS */}
@@ -91,7 +155,6 @@ to anomalous accounts. Rapid inflow and outflow patterns indicate potential mule
 
       {/* EXPLAINABILITY */}
       <Section title="Explainability">
-        {/* TABS */}
         <div className="flex mb-4 rounded-md overflow-hidden border border-zinc-700">
           <TabButton
             active={activeSlide === "shap"}
@@ -108,7 +171,6 @@ to anomalous accounts. Rapid inflow and outflow patterns indicate potential mule
           </TabButton>
         </div>
 
-        {/* SLIDES */}
         <div className="min-h-[140px] transition-all">
           {activeSlide === "shap" ? (
             <ShapSlide
@@ -139,7 +201,9 @@ to anomalous accounts. Rapid inflow and outflow patterns indicate potential mule
   );
 }
 
-function Section({ title, children }) {
+/* ================= SUB COMPONENTS ================= */
+
+function Section({ title, children }: SectionProps) {
   return (
     <div className="p-5 border-b border-zinc-800">
       <h3 className="mb-3 text-sm font-semibold uppercase text-gray-400">
@@ -150,7 +214,12 @@ function Section({ title, children }) {
   );
 }
 
-function Metric({ label, value, highlight, color }) {
+function Metric({
+  label,
+  value,
+  highlight,
+  color,
+}: MetricProps) {
   const colorClass =
     color === "red"
       ? "text-red-400"
@@ -161,14 +230,20 @@ function Metric({ label, value, highlight, color }) {
   return (
     <div className="flex justify-between text-sm mb-2">
       <span className="text-gray-400">{label}</span>
-      <span className={`${highlight ? "font-semibold" : ""} ${colorClass}`}>
+      <span
+        className={`${highlight ? "font-semibold" : ""} ${colorClass}`}
+      >
         {value}
       </span>
     </div>
   );
 }
 
-function TabButton({ active, onClick, children }) {
+function TabButton({
+  active,
+  onClick,
+  children,
+}: TabButtonProps) {
   return (
     <button
       onClick={onClick}
@@ -185,8 +260,15 @@ function TabButton({ active, onClick, children }) {
   );
 }
 
-function ShapSlide({ reasons, loading, isAnomalous }) {
-  if (loading) return <p className="text-xs text-gray-500">Loading…</p>;
+function ShapSlide({
+  reasons,
+  loading,
+  isAnomalous,
+}: ShapSlideProps) {
+  if (loading)
+    return (
+      <p className="text-xs text-gray-500">Loading…</p>
+    );
 
   if (!reasons.length) {
     return (
@@ -216,7 +298,11 @@ function ShapSlide({ reasons, loading, isAnomalous }) {
   );
 }
 
-function AISlide({ aiText, loading, onGenerate }) {
+function AISlide({
+  aiText,
+  loading,
+  onGenerate,
+}: AISlideProps) {
   return (
     <>
       <div className="min-h-[80px] mb-3">

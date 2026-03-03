@@ -1,7 +1,0 @@
-node_modules
-.vite
-dist
-.git
-.gitignore
-Dockerfile
-README.md
