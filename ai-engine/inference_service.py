@@ -1,7 +1,8 @@
 """
-MuleHunter AI - Elite Inference Service 
+MuleHunter AI - Inference Service
 ============================================
 FastAPI service with:
+- /v1/gnn/score             → Spring Boot contract (gnnScore, confidence, fraudClusterId, embeddingNorm)
 - /analyze-transaction      → Real-time risk scoring with explainability
 - /analyze-batch            → Bulk transaction analysis
 - /detect-rings             → Money laundering ring detection
