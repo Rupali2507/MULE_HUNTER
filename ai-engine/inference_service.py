@@ -72,14 +72,16 @@ class MuleHunterGNN(torch.nn.Module):
             torch.nn.Linear(32, out),
         )
 
-    def forward(self, x, edge_index):
+    def forward(self, x, edge_index, return_embedding=False):
         identity = self.skip(x)
         x = F.relu(self.bn1(self.conv1(x, edge_index)))
-        x = F.dropout(x, p=0.0, training=self.training)   # Inference: no dropout
+        x = F.dropout(x, p=0.0, training=self.training)
         x = F.relu(self.bn2(self.conv2(x, edge_index)))
         x = F.relu(self.bn3(self.conv3(x, edge_index)))
-        x = x + identity
-        return F.log_softmax(self.classifier(x), dim=1)
+        embedding = x + identity          # shape (N, 32) — this is the node embedding
+        if return_embedding:
+            return F.log_softmax(self.classifier(embedding), dim=1), embedding
+        return F.log_softmax(self.classifier(embedding), dim=1)
 
 
 # ─────────────────────────────────────────────
@@ -120,6 +122,26 @@ class ClusterReport(BaseModel):
     total_clusters:      int
     high_risk_clusters:  int
     top_clusters:        List[Dict[str, Any]]
+
+# ─────────────────────────────────────────────
+# SPRING BOOT CONTRACT SCHEMAS
+# ─────────────────────────────────────────────
+class GraphFeatures(BaseModel):
+    suspiciousNeighborCount: int   = 0
+    twoHopFraudDensity:      float = 0.0
+    connectivityScore:       float = 0.0
+
+class GnnScoreRequest(BaseModel):
+    accountId:     str
+    graphFeatures: GraphFeatures = GraphFeatures()
+
+class GnnScoreResponse(BaseModel):
+    model:          str   = "GNN"
+    version:        str
+    gnnScore:       float          # 0–1 structural fraud probability
+    confidence:     float          # softmax gap between fraud/safe class
+    fraudClusterId: int            # community cluster ID
+    embeddingNorm:  float          # L2 norm of node embedding vector
 
 
 # ─────────────────────────────────────────────
@@ -312,6 +334,7 @@ def health():
             "status":       "HEALTHY",
             "model_loaded": True,
             "nodes_count":  base_graph.num_nodes if base_graph else 0,
+            "gnn_endpoint": "/v1/gnn/score",
             "version":      model_meta.get("version", "unknown") if model_meta else "unknown",
             "test_f1":      model_meta.get("test_f1", 0) if model_meta else 0,
             "test_auc":     model_meta.get("test_auc", 0) if model_meta else 0,
@@ -501,3 +524,63 @@ def network_snapshot(limit: int = 200):
             "fraud_rate":   round(float(node_df["is_fraud"].mean()), 4),
         }
     }
+
+@app.post("/v1/gnn/score", response_model=GnnScoreResponse)
+def gnn_score(request: GnnScoreRequest):
+    """
+    Spring Boot contract endpoint.
+    Called in parallel with EIF service by the Risk Fusion layer.
+    Input: accountId + precomputed graphFeatures from Spring Boot.
+    Output: strict GNN contract (gnnScore, confidence, fraudClusterId, embeddingNorm).
+    """
+    if not _initialized:
+        load_assets()
+    if model is None:
+        raise HTTPException(503, "Model not loaded")
+
+    account_id = str(request.accountId)
+
+    # ── Resolve node index ──────────────────────
+    if account_id in id_map:
+        src_idx = id_map[account_id]
+    else:
+        # Unknown account — inject as zero-feature node
+        src_idx = base_graph.x.size(0)
+
+    x          = base_graph.x.clone()
+    edge_index = base_graph.edge_index.clone()
+
+    # Inject placeholder node if new
+    if src_idx == base_graph.x.size(0):
+        x = torch.cat([x, torch.zeros((1, x.size(1)))], dim=0)
+
+    # ── GNN forward pass with embedding ─────────
+    with torch.no_grad():
+        logits, embeddings = model(x, edge_index, return_embedding=True)
+        probs      = logits[src_idx].exp()          # [P(safe), P(fraud)]
+        gnn_score  = float(probs[1])                # fraud probability
+        confidence = float(abs(probs[1] - probs[0])) # softmax gap
+
+    # ── Embedding norm ───────────────────────────
+    node_embedding  = embeddings[src_idx]
+    embedding_norm  = float(torch.norm(node_embedding, p=2).item())
+
+    # ── Fraud cluster ID ─────────────────────────
+    fraud_cluster_id = 0
+    if node_df is not None and account_id in id_map:
+        row = node_df[node_df["node_id"] == account_id]
+        if not row.empty and "community_fraud_rate" in node_df.columns:
+            # Use community index as cluster ID (derived from fraud rate bucket)
+            rate = float(row.iloc[0].get("community_fraud_rate", 0))
+            fraud_cluster_id = int(rate * 100)  # encode as integer bucket
+
+    version = model_meta.get("version", "GNN-v1") if model_meta else "GNN-v1"
+
+    return GnnScoreResponse(
+        model          = "GNN",
+        version        = version,
+        gnnScore       = round(gnn_score, 6),
+        confidence     = round(confidence, 6),
+        fraudClusterId = fraud_cluster_id,
+        embeddingNorm  = round(embedding_norm, 6),
+    )
