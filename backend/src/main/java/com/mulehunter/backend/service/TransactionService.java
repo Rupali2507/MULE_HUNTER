@@ -19,6 +19,7 @@ public class TransactionService {
     private final Ja3SecurityService ja3SecurityService;
     private final AiRiskService aiRiskService;
     private final TransactionValidationService validationService;
+    private final IdentityCollectorService identityCollectorService;
 
     public TransactionService(
             TransactionRepository repository,
@@ -26,7 +27,8 @@ public class TransactionService {
             VisualAnalyticsService visualAnalyticsService,
             Ja3SecurityService ja3SecurityService,
             AiRiskService aiRiskService,
-            TransactionValidationService validationService
+            TransactionValidationService validationService,
+            IdentityCollectorService identityCollectorService
     ) {
         this.repository = repository;
         this.nodeEnrichedService = nodeEnrichedService;
@@ -34,6 +36,7 @@ public class TransactionService {
         this.ja3SecurityService = ja3SecurityService;
         this.aiRiskService = aiRiskService;
         this.validationService = validationService;
+        this.identityCollectorService = identityCollectorService;
     }
 
     public Mono<Transaction> createTransaction(TransactionRequest request, String ja3) {
@@ -57,6 +60,15 @@ public class TransactionService {
                     double amount = tx.getAmount().doubleValue();
 
                     return repository.save(tx)
+
+                            .flatMap(savedTx ->
+                                        identityCollectorService.collect(
+                                        savedTx,
+                                        ja3,
+                                        "device-" + savedTx.getSourceAccount(),
+                                        "127.0.0.1"
+                                    )
+                            )
 
                             .flatMap(savedTx ->
                                     Mono.when(

@@ -49,6 +49,16 @@ public class Transaction {
     private Integer ja3Velocity;
     private Integer ja3Fanout;
 
+    private String deviceHash;
+    private String ipAddress;
+
+    private Integer ja3ReuseCount;
+    private Integer deviceReuseCount;
+    private Integer ipReuseCount;
+
+    private Boolean isNewDevice;
+    private Boolean isNewJa3;
+
     public Transaction() {}
 
     public static Transaction from(TransactionRequest request) {
@@ -137,4 +147,62 @@ public class Transaction {
 
     public Integer getJa3Fanout() { return ja3Fanout; }
     public void setJa3Fanout(Integer ja3Fanout) { this.ja3Fanout = ja3Fanout; }
+
+    public String getDeviceHash() {return deviceHash;}
+
+    public void setDeviceHash(String deviceHash) { this.deviceHash = deviceHash;}
+
+
+public String getIpAddress() {
+    return ipAddress;
+}
+
+public void setIpAddress(String ipAddress) {
+    this.ipAddress = ipAddress;
+}
+
+// ja3ReuseCount
+public Integer getJa3ReuseCount() {
+    return ja3ReuseCount;
+}
+
+public void setJa3ReuseCount(Integer ja3ReuseCount) {
+    this.ja3ReuseCount = ja3ReuseCount;
+}
+
+// deviceReuseCount
+public Integer getDeviceReuseCount() {
+    return deviceReuseCount;
+}
+
+public void setDeviceReuseCount(Integer deviceReuseCount) {
+    this.deviceReuseCount = deviceReuseCount;
+}
+
+// ipReuseCount
+public Integer getIpReuseCount() {
+    return ipReuseCount;
+}
+
+public void setIpReuseCount(Integer ipReuseCount) {
+    this.ipReuseCount = ipReuseCount;
+}
+
+// isNewDevice
+public Boolean getIsNewDevice() {
+    return isNewDevice;
+}
+
+public void setIsNewDevice(Boolean isNewDevice) {
+    this.isNewDevice = isNewDevice;
+}
+
+// isNewJa3
+public Boolean getIsNewJa3() {
+    return isNewJa3;
+}
+
+public void setIsNewJa3(Boolean isNewJa3) {
+    this.isNewJa3 = isNewJa3;
+}
 }
