@@ -152,13 +152,51 @@ def evaluate(model, data, mask, threshold=0.5):
         "recall":    float(recall_score(true, pred, zero_division=0)),
         "auc_roc":   float(roc_auc_score(true, prob)) if len(np.unique(true)) > 1 else 0.0,
         "confusion_matrix": confusion_matrix(true, pred).tolist(),
+        "threshold_used": threshold,
     }
+
+
+def find_best_threshold(model, data, mask):
+    """
+    FIX Gap 3: Find the decision threshold that maximises F1 on the validation set.
+    The default 0.5 is rarely optimal for imbalanced fraud data.
+    Returns the best threshold and its F1 score.
+    """
+    from sklearn.metrics import precision_recall_curve
+    model.eval()
+    with torch.no_grad():
+        out  = model(data.x, data.edge_index)
+        prob = out[mask].exp()[:, 1].cpu().numpy()
+        true = data.y[mask].cpu().numpy()
+
+    if len(np.unique(true)) < 2:
+        return 0.5, 0.0
+
+    prec, rec, thresholds = precision_recall_curve(true, prob)
+    # F1 for each threshold (prec/rec have one more element than thresholds)
+    f1_scores = np.where(
+        (prec[:-1] + rec[:-1]) > 0,
+        2 * prec[:-1] * rec[:-1] / (prec[:-1] + rec[:-1]),
+        0.0
+    )
+    best_idx   = f1_scores.argmax()
+    best_thresh = float(thresholds[best_idx])
+    best_f1     = float(f1_scores[best_idx])
+    logger.info(f"   🎯 Optimal threshold: {best_thresh:.4f}  (F1={best_f1:.4f} vs default-0.5)")
+    return best_thresh, best_f1
 
 
 # ─────────────────────────────────────────────
 # TRAINING LOOP
 # ─────────────────────────────────────────────
 def train():
+    # FIX Bug 6: deterministic training — same results every run
+    import random
+    torch.manual_seed(42)
+    np.random.seed(42)
+    random.seed(42)
+    torch.backends.cudnn.deterministic = True
+
     logger.info("=" * 60)
     logger.info("🚀 MuleHunter GNN Trainer v2.0 — ELITE MODE")
     logger.info("=" * 60)
@@ -224,15 +262,22 @@ def train():
     logger.info("\n🔍 Loading best model for final test evaluation...")
     model.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"))
 
-    test_metrics = evaluate(model, data, data.test_mask)
-    val_metrics  = evaluate(model, data, data.val_mask)
+    # FIX Gap 3: find optimal threshold on val set, then apply it consistently to test
+    best_thresh, _ = find_best_threshold(model, data, data.val_mask)
+
+    test_metrics = evaluate(model, data, data.test_mask, threshold=best_thresh)
+    val_metrics  = evaluate(model, data, data.val_mask,  threshold=best_thresh)
+    # Also record default-threshold metrics for comparison
+    test_default = evaluate(model, data, data.test_mask, threshold=0.5)
 
     logger.info("\n" + "=" * 60)
     logger.info("📊 FINAL EVALUATION REPORT")
     logger.info("=" * 60)
     for k, v in test_metrics.items():
-        if k != "confusion_matrix":
+        if k not in ("confusion_matrix", "threshold_used"):
             logger.info(f"   Test {k.upper():<20}: {v:.4f}")
+    logger.info(f"   Test THRESHOLD          : {best_thresh:.4f}  (tuned) vs 0.5000 (default)")
+    logger.info(f"   Default-thresh F1        : {test_default['f1']:.4f}")
 
     cm = np.array(test_metrics["confusion_matrix"])
     logger.info(f"\n   Confusion Matrix:\n   TN={cm[0,0]:>6}  FP={cm[0,1]:>6}\n   FN={cm[1,0]:>6}  TP={cm[1,1]:>6}")
@@ -242,7 +287,9 @@ def train():
     report = {
         "test": test_metrics,
         "val":  val_metrics,
+        "test_default_threshold": test_default,
         "best_val_f1": best_val_f1,
+        "optimal_threshold": best_thresh,
         "training_history": history,
         "model_config": {
             "in_channels":     actual_features,
@@ -256,13 +303,14 @@ def train():
         json.dump(report, f, indent=2)
 
     meta = {
-        "version":        "MuleHunter-V2-Elite",
-        "in_channels":    actual_features,
-        "hidden_channels": HIDDEN_CHANNELS,
-        "test_f1":        test_metrics["f1"],
-        "test_auc":       test_metrics["auc_roc"],
-        "test_precision": test_metrics["precision"],
-        "test_recall":    test_metrics["recall"],
+        "version":           "MuleHunter-V2-Elite",
+        "in_channels":       actual_features,
+        "hidden_channels":   HIDDEN_CHANNELS,
+        "test_f1":           test_metrics["f1"],
+        "test_auc":          test_metrics["auc_roc"],
+        "test_precision":    test_metrics["precision"],
+        "test_recall":       test_metrics["recall"],
+        "optimal_threshold": best_thresh,   # FIX Gap 3: tuned threshold for inference
     }
     with open(MODEL_META, "w") as f:
         json.dump(meta, f, indent=2)
