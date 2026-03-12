@@ -1,129 +1,244 @@
 package securityforensics;
 
 import securityforensics.blockchain.*;
-import securityforensics.ja3.BotDetectionService;
-import securityforensics.ja3.JA3RiskResult;
+import securityforensics.ja3.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import jakarta.servlet.http.HttpServletRequest;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.*;
 
 @RestController
 @RequestMapping("/api/security")
 @CrossOrigin(origins = "*")
 public class SecurityController {
-    
+
     @Autowired
     private BotDetectionService botService;
-    
+
+    @Autowired
+    private IdentityProfileStore profileStore;
+
     private static final Blockchain blockchain = new Blockchain();
-    // Health
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // HEALTH
+    // ─────────────────────────────────────────────────────────────────────────
+
     @GetMapping("/status")
     public Map<String, String> getStatus() {
         Map<String, String> response = new HashMap<>();
         response.put("status", "UP");
         response.put("service", "security-forensics");
-        response.put("port", "8080");
+        response.put("port", "8081");
         return response;
     }
-    // JA3 RISK
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ENDPOINT 1: JA3 BOT DETECTION (existing — kept as-is)
+    // Called by: Spring Boot backend Ja3SecurityService
+    // Returns: ja3Risk score (velocity + fanout based)
+    // ─────────────────────────────────────────────────────────────────────────
+
     @PostMapping("/ja3-risk")
     public Map<String, Object> evaluateJA3(
-            @RequestBody FraudRequest requestBody,
+            @RequestBody JA3Request requestBody,
             HttpServletRequest request
     ) {
-        // ✅ READ FROM HEADER, NOT ATTRIBUTE
         String ja3 = request.getHeader("X-JA3-Fingerprint");
+        if (ja3 == null) ja3 = requestBody.ja3Fingerprint; // fallback to body
 
-        System.out.println("🛡️ SECURITY RECEIVED JA3 = " + ja3);
+        System.out.println("🛡️  JA3 BOT CHECK: ja3=" + ja3 + " account=" + requestBody.accountId);
 
-        JA3RiskResult result = botService.evaluate(
-                ja3,
-                requestBody.accountId
-        );
+        JA3RiskResult result = botService.evaluate(ja3, requestBody.accountId);
 
         Map<String, Object> response = new HashMap<>();
         response.put("ja3", ja3);
         response.put("ja3Risk", result.ja3Risk);
         response.put("velocity", result.velocity);
         response.put("fanout", result.fanout);
-
         return response;
     }
 
-    //  BLOCKCHAIN
-    @GetMapping("/blockchain")
-    public Map<String, Object> getBlockchain() {
-        Map<String, Object> response = new HashMap<>();
-        response.put("chain", blockchain.chain);
-        response.put("totalBlocks", blockchain.chain.size());
-        response.put("pendingLogs", blockchain.getPendingCount());
-        
-        int totalLogs = blockchain.chain.stream()
-                .mapToInt(block -> block.logs.size())
-                .sum();
-        response.put("totalFraudLogs", totalLogs);
-        
-        return response;
-    }
-    
-    @PostMapping("/log-fraud")
-    public Map<String, Object> logFraud(@RequestBody FraudRequest request) {
-        System.out.println("🚨 Logging fraud: " + request.txId);
-        
-        FraudLog log = new FraudLog(
-            request.txId,
-            request.accountId,
-            request.amount,
-            true
+    // ─────────────────────────────────────────────────────────────────────────
+    // ENDPOINT 2: IDENTITY FORENSICS (NEW — this is what was missing)
+    // Called by: Spring Boot backend (Step 3 of pipeline)
+    // Returns: full identityFeatures block per architecture doc
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @PostMapping("/identity-forensics")
+    public Map<String, Object> identityForensics(
+            @RequestBody IdentityForensicsRequest req,
+            HttpServletRequest httpRequest
+    ) {
+        // Step 1 — Normalize & canonicalize
+        String ja3         = req.ja3Fingerprint != null ? req.ja3Fingerprint.toLowerCase().trim() : null;
+        String deviceHash  = sha256(req.deviceId != null ? req.deviceId : "unknown");
+        String ip          = req.ipAddress != null ? req.ipAddress.trim() : null;
+        String geoCountry  = req.geoCountry != null ? req.geoCountry.toUpperCase() : null;
+
+        System.out.println("🔍 IDENTITY FORENSICS: account=" + req.accountId
+                + " ja3=" + (ja3 != null ? ja3.substring(0, Math.min(20, ja3.length())) + "..." : "null")
+                + " device=" + deviceHash.substring(0, 8) + "..."
+                + " ip=" + ip);
+
+        // Step 2 — Compute forensic signals
+        IdentityForensicResult forensics = profileStore.record(
+                req.accountId, ja3, deviceHash, ip,
+                geoCountry,
+                req.accountKnownCountry
         );
-        
-        blockchain.addLog(log);  
-        
+
+        // Step 3 — Bot risk check (bonus signal)
+        JA3RiskResult botResult = botService.evaluate(ja3, req.accountId);
+
+        // Step 4 — Build response matching architecture doc exactly
+        Map<String, Object> identityFeatures = new LinkedHashMap<>();
+        identityFeatures.put("ja3ReuseCount",    forensics.ja3ReuseCount);
+        identityFeatures.put("deviceReuseCount", forensics.deviceReuseCount);
+        identityFeatures.put("ipReuseCount",     forensics.ipReuseCount);
+        identityFeatures.put("geoMismatch",      forensics.geoMismatch);
+        identityFeatures.put("isNewDevice",      forensics.isNewDevice);
+        identityFeatures.put("isNewJa3",         forensics.isNewJa3);
+
+        // Extra bot signals (bonus, not in original spec but useful)
+        identityFeatures.put("ja3Risk",          botResult.ja3Risk);
+        identityFeatures.put("ja3Velocity",      botResult.velocity);
+        identityFeatures.put("ja3Fanout",        botResult.fanout);
+
+        Map<String, Object> identityMetadata = new LinkedHashMap<>();
+        identityMetadata.put("ja3FirstSeen",     forensics.isNewJa3);
+        identityMetadata.put("deviceFirstSeen",  forensics.isNewDevice);
+        identityMetadata.put("normalizedJa3",    ja3);
+        identityMetadata.put("deviceHash",       deviceHash);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("identityFeatures", identityFeatures);
+        response.put("identityMetadata", identityMetadata);
+
+        System.out.println("✅ IDENTITY FORENSICS DONE: ja3Reuse=" + forensics.ja3ReuseCount
+                + " deviceReuse=" + forensics.deviceReuseCount
+                + " geoMismatch=" + forensics.geoMismatch);
+
+        return response;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ENDPOINT 3: LOG FRAUD DECISION → BLOCKCHAIN
+    // Called by: Spring Boot backend (async, after response returned)
+    // Payload: full fraud decision per architecture doc
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @PostMapping("/log-fraud")
+    public Map<String, Object> logFraud(@RequestBody FraudDecisionRequest req) {
+        System.out.println("⛓️  BLOCKCHAIN LOG: txId=" + req.txId
+                + " decision=" + req.decision
+                + " riskScore=" + req.riskScore);
+
+        FraudLog log = new FraudLog(
+                req.txId,
+                req.accountId,
+                req.amount,
+                req.riskScore,
+                req.decision != null ? req.decision : "UNKNOWN",
+                req.modelVersionEIF != null ? req.modelVersionEIF : "unknown",
+                req.modelVersionGNN != null ? req.modelVersionGNN : "unknown"
+        );
+
+        blockchain.addLog(log);
+
         Map<String, Object> response = new HashMap<>();
         response.put("status", "queued");
         response.put("pendingLogs", blockchain.getPendingCount());
         response.put("totalBlocks", blockchain.chain.size());
-        
+        response.put("decisionHash", log.decisionHash);
         return response;
     }
-    
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ENDPOINT 4: VIEW BLOCKCHAIN
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @GetMapping("/blockchain")
+    public Map<String, Object> getBlockchain() {
+        int totalLogs = blockchain.chain.stream()
+                .mapToInt(block -> block.logs.size())
+                .sum();
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("chain", blockchain.chain);
+        response.put("totalBlocks", blockchain.chain.size());
+        response.put("pendingLogs", blockchain.getPendingCount());
+        response.put("totalFraudLogs", totalLogs);
+        return response;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ENDPOINT 5: FORCE BLOCK (demo use)
+    // ─────────────────────────────────────────────────────────────────────────
+
     @PostMapping("/force-block")
     public Map<String, Object> forceBlock() {
         blockchain.forceBlock();
         Block latest = blockchain.chain.get(blockchain.chain.size() - 1);
-        
+
         Map<String, Object> response = new HashMap<>();
         response.put("status", "forced");
         response.put("blockIndex", latest.index);
         response.put("blockHash", latest.hash);
+        response.put("merkleRoot", latest.merkleRoot);
         response.put("logsInBlock", latest.logs.size());
-        
         return response;
     }
-    
-    @PostMapping("/test-fraud")
-    public Map<String, String> testFraud() {
-        FraudLog log = new FraudLog(
-            "TX_" + System.currentTimeMillis(),
-            "ACC_TEST",
-            5000.0,
-            true
-        );
-        
-        blockchain.addLog(log);
-        
-        Map<String, String> response = new HashMap<>();
-        response.put("status", "logged");
-        response.put("message", "Test fraud queued. Pending: " + blockchain.getPendingCount());
-        
-        return response;
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // UTIL
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private String sha256(String input) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(input.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hash) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (Exception e) {
+            return "hash-error";
+        }
     }
 }
-// DTO
-class FraudRequest {
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REQUEST DTOs
+// ─────────────────────────────────────────────────────────────────────────────
+
+class JA3Request {
+    public String accountId;
+    public String txId;
+    public String ja3Fingerprint; // fallback if header not present
+}
+
+class IdentityForensicsRequest {
+    public String transactionId;
+    public String accountId;          // sourceAccountId
+    public String ja3Fingerprint;
+    public String deviceId;
+    public String ipAddress;
+    public String userAgent;
+    public String geoCountry;         // country from current request
+    public String geoCity;
+    public String accountKnownCountry; // account's registered country (for geo mismatch)
+}
+
+class FraudDecisionRequest {
     public String txId;
     public String accountId;
     public double amount;
+    public double riskScore;
+    public String decision;           // APPROVE / REVIEW / BLOCK
+    public String modelVersionEIF;
+    public String modelVersionGNN;
+    public String timestamp;
 }
