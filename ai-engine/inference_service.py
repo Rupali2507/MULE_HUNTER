@@ -31,7 +31,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from torch_geometric.nn import SAGEConv, GATConv, BatchNorm
 from torch_geometric.data import Data
-
+from models.eif_model import score_eif
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger("MuleHunter-AI")
 
@@ -140,18 +140,29 @@ class GraphFeatures(BaseModel):
     twoHopFraudDensity:      float = 0.0
     connectivityScore:       float = 0.0
 
+class BehaviorFeatures(BaseModel):
+    velocity: float = 0
+    burst: float = 0
+
+class IdentityFeatures(BaseModel):
+    ja3Reuse: int = 0
+    deviceReuse: int = 0
+    ipReuse: int = 0
+
 class GnnScoreRequest(BaseModel):
-    accountId:     str
+    accountId: str
     graphFeatures: GraphFeatures = GraphFeatures()
+    behaviorFeatures: BehaviorFeatures = BehaviorFeatures()
+    identityFeatures: IdentityFeatures = IdentityFeatures()
 
 class GnnScoreResponse(BaseModel):
-    model:          str   = "GNN"
-    version:        str
-    gnnScore:       float          # 0–1 structural fraud probability
-    confidence:     float          # softmax gap between fraud/safe class
-    fraudClusterId: int            # community cluster ID
-    embeddingNorm:  float          # L2 norm of node embedding vector
-
+    model: str
+    version: str
+    gnnScore: float
+    eifScore: float
+    confidence: float
+    fraudClusterId: int
+    embeddingNorm: float
 
 # ─────────────────────────────────────────────
 # GLOBAL STATE
@@ -618,7 +629,24 @@ def gnn_score(request: GnnScoreRequest):
                        + 0.20 * hop_density
                        + 0.10 * neighbor_signal)
     gnn_score_final = round(min(1.0, max(0.0, gnn_score_final)), 6)
+    
 
+    # behavior = request.behaviorFeatures
+    # identity = request.identityFeatures
+
+    # eif_score = score_eif({
+    #     "velocity": float(behavior.velocity or 0),
+    #     "burst": float(behavior.burst or 0),
+    #     "deviceReuse": int(identity.deviceReuse or 0),
+    #     "ja3Reuse": int(identity.ja3Reuse or 0),
+    #     "ipReuse": int(identity.ipReuse or 0)
+    # })
+
+    node_features = x[src_idx].cpu().numpy()
+
+    eif_score = score_eif(node_features)
+
+    eif_score = max(0.0, min(1.0, float(eif_score)))
     # ── Embedding norm ───────────────────────────
     node_embedding = embeddings[src_idx]
     embedding_norm = round(float(torch.norm(node_embedding, p=2).item()), 6)
@@ -633,10 +661,11 @@ def gnn_score(request: GnnScoreRequest):
     version = model_meta.get("version", "GNN-v1") if model_meta else "GNN-v1"
 
     return GnnScoreResponse(
-        model          = "GNN",
-        version        = version,
-        gnnScore       = gnn_score_final,
-        confidence     = round(confidence, 6),
-        fraudClusterId = fraud_cluster_id,
-        embeddingNorm  = embedding_norm,
+        model="GNN+EIF",
+        version=version,
+        gnnScore=gnn_score_final,
+        eifScore=eif_score,
+        confidence=round(confidence,6),
+        fraudClusterId=fraud_cluster_id,
+        embeddingNorm=embedding_norm
     )
