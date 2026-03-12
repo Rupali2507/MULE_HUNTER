@@ -166,18 +166,23 @@ public class TransactionService {
                                     BehaviorFeaturesDTO behavior,
                                     GraphFeaturesDTO graph) {
 
-        double gnnScore = tx.getRiskScore()        == null ? 0.0 : tx.getRiskScore();
+        double gnnScore = tx.getRiskScore() == null ? 0.0 : tx.getRiskScore();
         double eifScore = tx.getUnsupervisedScore() == null ? 0.0 : tx.getUnsupervisedScore();
-        double ja3Score = tx.getJa3Risk()           == null ? 0.0 : tx.getJa3Risk();
+        double ja3Score = tx.getJa3Risk() == null ? 0.0 : tx.getJa3Risk();
 
-        // BehaviorFeaturesDTO fields: getTransactionVelocityScore(), getBurstScore(), getAvgAmountDeviation()
-        double behaviorScore = behavior.getTransactionVelocityScore() * 0.3
-                + behavior.getBurstScore()               * 0.5
-                + behavior.getAvgAmountDeviation()       * 0.2;
+        double velocity = behavior.getTransactionVelocityScore();
+        double burst = behavior.getBurstScore();
 
-        // GraphFeaturesDTO fields: getConnectivityScore(), getTwoHopFraudDensity()
-        double graphScore = graph.getConnectivityScore()  * 0.6
-                + graph.getTwoHopFraudDensity() * 0.4;
+        double behaviorScore =
+                velocity * 0.3 +
+                burst * 0.5 +
+                behavior.getAvgAmountDeviation() * 0.2;
+
+        double graphScore =
+                graph.getConnectivityScore() * 0.6 +
+                graph.getTwoHopFraudDensity() * 0.4;
+
+        
 
         double raw = 0.40 * gnnScore
                 + 0.10 * eifScore
@@ -193,6 +198,12 @@ public class TransactionService {
 
         tx.setRiskScore(finalRisk);
         tx.setSuspectedFraud(finalRisk > 0.6);
+        // 🔴 STORE COMPONENT SCORES
+        tx.setGnnScore(gnnScore);
+        tx.setBehaviorScore(behaviorScore);
+        tx.setGraphScore(graphScore);
+        tx.setVelocityScore(velocity);
+        tx.setBurstScore(burst);
 
         String verdict = finalRisk >= 0.75 ? "BLOCK" : finalRisk >= 0.45 ? "REVIEW" : "APPROVE";
         tx.setVerdict(verdict);

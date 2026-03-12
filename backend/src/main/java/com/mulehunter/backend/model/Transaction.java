@@ -33,6 +33,14 @@ public class Transaction {
     private Double riskScore;
     private String verdict;
 
+    // ================= AI COMPONENT SCORES =================
+
+    private Double gnnScore;
+    private Double behaviorScore;
+    private Double velocityScore;
+    private Double burstScore;
+    private Double graphScore;
+
     // ================= GRAPH / AI =================
     private int outDegree;
     private Double riskRatio;
@@ -205,4 +213,21 @@ public Boolean getIsNewJa3() {
 public void setIsNewJa3(Boolean isNewJa3) {
     this.isNewJa3 = isNewJa3;
 }
+
+
+public Double getGnnScore() { return gnnScore; }
+public void setGnnScore(Double gnnScore) { this.gnnScore = gnnScore; }
+
+public Double getBehaviorScore() { return behaviorScore; }
+public void setBehaviorScore(Double behaviorScore) { this.behaviorScore = behaviorScore; }
+
+public Double getVelocityScore() { return velocityScore; }
+public void setVelocityScore(Double velocityScore) { this.velocityScore = velocityScore; }
+
+public Double getBurstScore() { return burstScore; }
+public void setBurstScore(Double burstScore) { this.burstScore = burstScore; }
+
+public Double getGraphScore() { return graphScore; }
+public void setGraphScore(Double graphScore) { this.graphScore = graphScore; }
+
 }

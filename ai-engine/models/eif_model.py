@@ -1,25 +1,25 @@
+import joblib
 import numpy as np
-from sklearn.ensemble import IsolationForest
+from pathlib import Path
 
-# Simple EIF model
-model = IsolationForest(
-    n_estimators=200,
-    contamination=0.05,
-    random_state=42
-)
+BASE_DIR = Path(__file__).resolve().parent
+SHARED = BASE_DIR.parent.parent / "shared-data"
 
-def score_eif(features: dict):
+MODEL_PATH = SHARED / "eif_model.pkl"
+SCALER_PATH = SHARED / "eif_scaler.pkl"
 
-    X = np.array([[
-        features.get("velocity",0),
-        features.get("burst",0),
-        features.get("deviceReuse",0),
-        features.get("ja3Reuse",0),
-        features.get("ipReuse",0)
-    ]])
+model = joblib.load(MODEL_PATH)
+scaler = joblib.load(SCALER_PATH)
+
+def score_eif(node_features):
+
+    X = np.array(node_features).reshape(1, -1)
+
+    X = scaler.transform(X)
 
     raw = -model.decision_function(X)[0]
 
-    score = max(0,min(1,raw))
+    score = (raw + 0.5) / 1.0
+    score = max(0.0, min(1.0, score))
 
     return float(score)

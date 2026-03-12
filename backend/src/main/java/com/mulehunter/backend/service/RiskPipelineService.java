@@ -5,6 +5,7 @@ import com.mulehunter.backend.model.Transaction;
 import com.mulehunter.backend.model.TransactionRequest;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
+import java.util.*;
 
 /**
  * Thin orchestration layer over TransactionService.
@@ -25,7 +26,8 @@ public class RiskPipelineService {
                 .map(this::toDecision);
     }
 
-    private RiskDecisionDTO toDecision(Transaction tx) {
+   private RiskDecisionDTO toDecision(Transaction tx) {
+
         double score = tx.getRiskScore() == null ? 0.0 : tx.getRiskScore();
 
         String decision;
@@ -33,12 +35,22 @@ public class RiskPipelineService {
         else if (score >= 0.45) decision = "REVIEW";
         else                    decision = "APPROVE";
 
+        Map<String, Double> components = Map.of(
+            "gnn", tx.getGnnScore() == null ? 0.0 : tx.getGnnScore(),
+            "eif", tx.getUnsupervisedScore() == null ? 0.0 : tx.getUnsupervisedScore(),
+            "behavior", tx.getBehaviorScore() == null ? 0.0 : tx.getBehaviorScore(),
+            "velocity", tx.getVelocityScore() == null ? 0.0 : tx.getVelocityScore(),
+            "burst", tx.getBurstScore() == null ? 0.0 : tx.getBurstScore(),
+            "ja3", tx.getJa3Risk() == null ? 0.0 : tx.getJa3Risk()
+        );
+
         return RiskDecisionDTO.builder()
                 .transactionId(tx.getTransactionId())
                 .decision(decision)
                 .riskScore(score)
                 .explanation(buildExplanation(tx, score))
                 .highConfidence(tx.isSuspectedFraud())
+                .components(components)
                 .build();
     }
 
