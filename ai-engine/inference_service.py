@@ -31,7 +31,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from torch_geometric.nn import SAGEConv, GATConv, BatchNorm
 from torch_geometric.data import Data
-from models.eif_model import score_eif
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger("MuleHunter-AI")
 
@@ -578,80 +578,58 @@ def network_snapshot(limit: int = 200):
         }
     }
 
+
 @app.post("/v1/gnn/score", response_model=GnnScoreResponse)
 def gnn_score(request: GnnScoreRequest):
-    """
-    Spring Boot contract endpoint.
-    Called in parallel with EIF service by the Risk Fusion layer.
-    Input: accountId + precomputed graphFeatures from Spring Boot.
-    Output: strict GNN contract (gnnScore, confidence, fraudClusterId, embeddingNorm).
 
-    FIX Bug 2: graphFeatures from Spring Boot are now blended into the final score.
-    FIX Bug 3: fraudClusterId is now the real integer community index, not rate*100.
-    FIX Bug 5: unknown accounts use neutral 0.5 baseline instead of zeros.
-    """
     if not _initialized:
         load_assets()
+
     if model is None:
         raise HTTPException(503, "Model not loaded")
 
     account_id = str(request.accountId)
 
-    # ── Resolve node index ──────────────────────
+    # Resolve node index
     if account_id in id_map:
         src_idx = id_map[account_id]
-        is_new  = False
+        is_new = False
     else:
-        # FIX Bug 5: use neutral 0.5 baseline — not zeros — for unknown accounts
         src_idx = base_graph.x.size(0)
-        is_new  = True
+        is_new = True
 
-    x          = base_graph.x.clone()
+    x = base_graph.x.clone()
     edge_index = base_graph.edge_index.clone()
 
+    # Inject neutral node for unknown accounts
     if is_new:
         x = torch.cat([x, torch.full((1, x.size(1)), 0.5)], dim=0)
 
-    # ── GNN forward pass with embedding ─────────
+    # Run GNN inference
     with torch.no_grad():
         logits, embeddings = model(x, edge_index, return_embedding=True)
-        probs      = logits[src_idx].exp()           # [P(safe), P(fraud)]
-        raw_score  = float(probs[1])                 # pure structural fraud probability
-        confidence = float(abs(probs[1] - probs[0])) # softmax gap = certainty
 
-    # ── FIX Bug 2: blend in Spring Boot precomputed graph features ────────────
-    # Spring Boot computes these from the live DB; they're complementary to the GNN.
+        probs = logits[src_idx].exp()
+        raw_score = float(probs[1])
+        confidence = float(abs(probs[1] - probs[0]))
+
+    # Blend Spring Boot graph features with GNN score
     neighbor_signal = min(1.0, request.graphFeatures.suspiciousNeighborCount / 10.0)
-    hop_density     = max(0.0, min(1.0, request.graphFeatures.twoHopFraudDensity))
+    hop_density = max(0.0, min(1.0, request.graphFeatures.twoHopFraudDensity))
 
-    # Weighted blend: 70% structural GNN + 20% 2-hop density + 10% neighbor count
-    gnn_score_final = (0.70 * raw_score
-                       + 0.20 * hop_density
-                       + 0.10 * neighbor_signal)
+    gnn_score_final = (
+        0.70 * raw_score
+        + 0.20 * hop_density
+        + 0.10 * neighbor_signal
+    )
+
     gnn_score_final = round(min(1.0, max(0.0, gnn_score_final)), 6)
-    
 
-    # behavior = request.behaviorFeatures
-    # identity = request.identityFeatures
-
-    # eif_score = score_eif({
-    #     "velocity": float(behavior.velocity or 0),
-    #     "burst": float(behavior.burst or 0),
-    #     "deviceReuse": int(identity.deviceReuse or 0),
-    #     "ja3Reuse": int(identity.ja3Reuse or 0),
-    #     "ipReuse": int(identity.ipReuse or 0)
-    # })
-
-    node_features = x[src_idx].cpu().numpy()
-
-    eif_score = score_eif(node_features)
-
-    eif_score = max(0.0, min(1.0, float(eif_score)))
-    # ── Embedding norm ───────────────────────────
+    # Embedding norm
     node_embedding = embeddings[src_idx]
     embedding_norm = round(float(torch.norm(node_embedding, p=2).item()), 6)
 
-    # ── FIX Bug 3: use real community_id integer, not rate*100 ───────────────
+    # Fraud cluster id
     fraud_cluster_id = 0
     if node_df is not None and not is_new and "community_id" in node_df.columns:
         row = node_df[node_df["node_id"] == account_id]
@@ -661,11 +639,10 @@ def gnn_score(request: GnnScoreRequest):
     version = model_meta.get("version", "GNN-v1") if model_meta else "GNN-v1"
 
     return GnnScoreResponse(
-        model="GNN+EIF",
+        model="GNN",
         version=version,
         gnnScore=gnn_score_final,
-        eifScore=eif_score,
-        confidence=round(confidence,6),
+        confidence=round(confidence, 6),
         fraudClusterId=fraud_cluster_id,
         embeddingNorm=embedding_norm
     )

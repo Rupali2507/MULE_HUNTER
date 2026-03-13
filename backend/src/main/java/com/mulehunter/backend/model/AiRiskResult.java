@@ -1,18 +1,29 @@
 package com.mulehunter.backend.model;
 
 import java.util.List;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class AiRiskResult {
 
+    @JsonProperty("gnnScore")
     private double riskScore;
+
     private String verdict;
     private boolean suspectedFraud;
 
     private int outDegree;
     private double riskRatio;
     private String populationSize;
+
+    @JsonProperty("version")
     private String modelVersion;
+
     private double unsupervisedScore;
+
+    @JsonProperty("confidence")
+    private Double confidence;
 
     private List<String> linkedAccounts;
 
@@ -86,5 +97,13 @@ public class AiRiskResult {
 
     public void setLinkedAccounts(List<String> linkedAccounts) {
         this.linkedAccounts = linkedAccounts;
+    }
+
+    public Double getConfidence() {
+        return confidence;
+    }
+
+    public void setConfidence(Double confidence) {
+        this.confidence = confidence;
     }
 }

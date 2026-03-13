@@ -67,6 +67,10 @@ public class Transaction {
     private Boolean isNewDevice;
     private Boolean isNewJa3;
 
+    private String eifTopFactors;
+    private String eifExplanation;
+    private Double gnnConfidence;
+
     public Transaction() {}
 
     public static Transaction from(TransactionRequest request) {
@@ -229,5 +233,19 @@ public void setBurstScore(Double burstScore) { this.burstScore = burstScore; }
 
 public Double getGraphScore() { return graphScore; }
 public void setGraphScore(Double graphScore) { this.graphScore = graphScore; }
+
+public String getEifTopFactors() { return eifTopFactors; }
+public void setEifTopFactors(String eifTopFactors) { this.eifTopFactors = eifTopFactors; }
+
+public String getEifExplanation() {
+    return eifExplanation;
+}
+
+public void setEifExplanation(String eifExplanation) {
+    this.eifExplanation = eifExplanation;
+}
+
+public Double getGnnConfidence() { return gnnConfidence; }
+public void setGnnConfidence(Double gnnConfidence) { this.gnnConfidence = gnnConfidence; }
 
 }

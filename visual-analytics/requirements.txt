@@ -10,3 +10,4 @@ sse_starlette
 uvicorn
 scipy
 requests
+torch
