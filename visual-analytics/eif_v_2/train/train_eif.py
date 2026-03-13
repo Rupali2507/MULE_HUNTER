@@ -1,124 +1,213 @@
-import os
-import json
-import joblib
-import numpy as np
 import pandas as pd
+import numpy as np
+import joblib
+import json
+from pathlib import Path
+
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import precision_score, recall_score, f1_score
+from sklearn.metrics import f1_score, precision_score, recall_score, roc_auc_score
 
-# =============================
-# CONFIG
-# =============================
 
-CSV_PATH = "../../shared-data/nodes.csv"   # adjust path if needed
-MODEL_DIR = "../models"
-MODEL_VERSION = "v1.0"
+# ---------------------------------------------------
+# PATHS
+# ---------------------------------------------------
 
-os.makedirs(MODEL_DIR, exist_ok=True)
+BASE_DIR = Path(__file__).resolve().parents[3]
 
-# =============================
-# LOAD DATA
-# =============================
+DATA_PATH = BASE_DIR / "shared-data" / "eif_features.csv"
+MODEL_DIR = BASE_DIR / "visual-analytics" / "eif_v_2" / "models"
 
-df = pd.read_csv(CSV_PATH)
+MODEL_PATH = MODEL_DIR / "eif_model.pkl"
+SCALER_PATH = MODEL_DIR / "eif_scaler.pkl"
+EVAL_PATH = MODEL_DIR / "eif_eval.json"
+META_PATH = MODEL_DIR / "model_metadata.json"
 
-# Keep label separately for evaluation
-y_true = df["is_fraud"]
 
-# Drop non-feature columns
-df = df.drop(columns=["node_id", "is_fraud"])
+# ---------------------------------------------------
+# FEATURES
+# ---------------------------------------------------
 
-# =============================
-# SELECT EIF FEATURES
-# (Behavioral + Identity only)
-# =============================
-
-EIF_FEATURES = [
-    "account_age_days",
-    "balance_mean",
-    "balance_std",
-    "tx_count",
-    "tx_velocity_7d",
-    "fan_out_ratio",
-    "amount_entropy",
-    "risky_email",
-    "device_mobile",
-    "device_consistency",
-    "addr_entropy",
-    "d_gap_mean",
-    "card_network_risk",
-    "product_code_risk",
-    "international_flag",
-    "in_out_ratio"
+FEATURES = [
+    "velocity_score",
+    "burst_score",
+    "suspicious_neighbor_count",
+    "ja3_reuse_count",
+    "device_reuse_count",
+    "ip_reuse_count"
 ]
 
-X = df[EIF_FEATURES].fillna(0)
 
-# =============================
-# PREPROCESSING
-# =============================
+print("\n🚀 Starting EIF Training Pipeline\n")
 
-# Log transform heavy-tailed columns
-for col in ["balance_mean", "balance_std", "tx_count"]:
-    X[col] = np.log1p(X[col])
 
-# =============================
+# ---------------------------------------------------
+# LOAD DATA
+# ---------------------------------------------------
+
+print("📂 Loading dataset:", DATA_PATH)
+
+df = pd.read_csv(DATA_PATH)
+
+print("Dataset shape:", df.shape)
+print("Columns:", list(df.columns))
+
+
+# ---------------------------------------------------
+# VALIDATE FEATURES
+# ---------------------------------------------------
+
+missing = [f for f in FEATURES if f not in df.columns]
+
+if missing:
+    raise ValueError(f"❌ Missing features: {missing}")
+
+print("✅ All required features present")
+
+
+# ---------------------------------------------------
+# EXTRACT FEATURES
+# ---------------------------------------------------
+
+X = df[FEATURES].values
+
+y = df["is_fraud"].values if "is_fraud" in df.columns else None
+
+
+print("\n🔎 Feature statistics")
+
+for f in FEATURES:
+    print(f"{f:30} min={df[f].min():.4f} max={df[f].max():.4f} mean={df[f].mean():.4f}")
+
+
+# ---------------------------------------------------
 # SCALE FEATURES
-# =============================
+# ---------------------------------------------------
+
+print("\n⚙️ Scaling features")
 
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
-# =============================
-# TRAIN ISOLATION FOREST
-# =============================
+
+# ---------------------------------------------------
+# TRAIN MODEL
+# ---------------------------------------------------
+
+print("\n🧠 Training Isolation Forest")
 
 model = IsolationForest(
-    n_estimators=300,
-    contamination=0.05,  # adjust based on fraud ratio
+    n_estimators=400,
+    contamination=0.05,
     random_state=42,
     n_jobs=-1
 )
 
 model.fit(X_scaled)
 
-# =============================
-# OFFLINE EVALUATION
-# =============================
 
-preds = model.predict(X_scaled)
-preds_binary = np.where(preds == -1, 1, 0)
+# ---------------------------------------------------
+# COMPUTE ANOMALY SCORES
+# ---------------------------------------------------
 
-precision = precision_score(y_true, preds_binary)
-recall = recall_score(y_true, preds_binary)
-f1 = f1_score(y_true, preds_binary)
+scores = -model.decision_function(X_scaled)
 
-print("========== OFFLINE METRICS ==========")
-print("Precision:", round(precision, 4))
-print("Recall:", round(recall, 4))
-print("F1 Score:", round(f1, 4))
+print("\n📊 Score statistics")
 
-# =============================
-# SAVE MODEL + SCALER
-# =============================
+print("min:", scores.min())
+print("max:", scores.max())
+print("mean:", scores.mean())
 
-joblib.dump(model, f"{MODEL_DIR}/eif_model.pkl")
-joblib.dump(scaler, f"{MODEL_DIR}/eif_scaler.pkl")
+
+# ---------------------------------------------------
+# THRESHOLD
+# ---------------------------------------------------
+
+threshold = np.percentile(scores, 95)
+
+print("\n🎯 Computed anomaly threshold:", threshold)
+
+
+# ---------------------------------------------------
+# SAVE MODEL
+# ---------------------------------------------------
+
+MODEL_DIR.mkdir(parents=True, exist_ok=True)
+
+joblib.dump(model, MODEL_PATH)
+joblib.dump(scaler, SCALER_PATH)
+
+print("\n💾 Model saved:", MODEL_PATH)
+print("💾 Scaler saved:", SCALER_PATH)
+
+
+# ---------------------------------------------------
+# EVALUATION
+# ---------------------------------------------------
+
+metrics = {}
+
+if y is not None:
+
+    print("\n📈 Running evaluation")
+
+    preds = (scores >= threshold).astype(int)
+
+    f1 = f1_score(y, preds)
+    precision = precision_score(y, preds)
+    recall = recall_score(y, preds)
+    auc = roc_auc_score(y, scores)
+
+    metrics = {
+        "f1": float(f1),
+        "precision": float(precision),
+        "recall": float(recall),
+        "auc": float(auc),
+        "threshold": float(threshold)
+    }
+
+    with open(EVAL_PATH, "w") as f:
+        json.dump(metrics, f, indent=2)
+
+    print("\n📊 Evaluation Metrics")
+    print("F1 Score   :", f1)
+    print("Precision  :", precision)
+    print("Recall     :", recall)
+    print("ROC AUC    :", auc)
+
+else:
+
+    metrics = {"threshold": float(threshold)}
+
+    print("\n⚠️ No labels found. Skipping evaluation.")
+
+
+# ---------------------------------------------------
+# METADATA
+# ---------------------------------------------------
 
 metadata = {
     "model": "EIF",
-    "version": MODEL_VERSION,
-    "features": EIF_FEATURES,
-    "metrics": {
-        "precision": float(precision),
-        "recall": float(recall),
-        "f1": float(f1)
-    },
-    "training_rows": int(len(df))
+    "version": "v3",
+    "feature_dim": len(FEATURES),
+    "threshold": float(threshold),
+    "features": FEATURES
 }
 
-with open(f"{MODEL_DIR}/model_metadata.json", "w") as f:
+with open(META_PATH, "w") as f:
     json.dump(metadata, f, indent=2)
 
-print("✅ Model training complete and saved.")
+print("\n📦 Metadata saved:", META_PATH)
+
+
+# ---------------------------------------------------
+# DEBUG SAMPLE SCORES
+# ---------------------------------------------------
+
+print("\n🔬 Sample anomaly scores")
+
+for i in range(5):
+    print(f"sample {i}: score={scores[i]:.4f}")
+
+
+print("\n✅ EIF Training Complete\n")

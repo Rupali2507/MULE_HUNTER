@@ -1,17 +1,19 @@
 from fastapi import FastAPI
-from .schemas import ScoreRequest, ScoreResponse
-from .inference import score_features
+from .schemas import EIFRequest
+from .inference import score_eif
 
-app = FastAPI(
-    title="EIF Behavioral Scoring Service",
-    version="1.0.0"
-)
+app = FastAPI()
 
-@app.post("/eif/score", response_model=ScoreResponse)
-def score(request: ScoreRequest):
-    result = score_features(request.features)
-    return result
+@app.post("/v1/eif/score")
+def score(req: EIFRequest):
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+    score, top_factors, explanation = score_eif(req.features)
+
+    return {
+        "model": "EIF",
+        "version": "v2.1",
+        "score": score,
+        "confidence": 0.88,
+        "topFactors": top_factors,
+        "explanation": explanation
+    }

@@ -26,6 +26,7 @@ public class TransactionService {
     private final AggregateUpdateService      aggregateUpdateService;
     private final BehaviorFeatureService      behaviorFeatureService;
     private final GraphFeatureService         graphFeatureService;
+    private final EifService eifService;
 
     public TransactionService(
             TransactionRepository       repository,
@@ -37,7 +38,8 @@ public class TransactionService {
             IdentityCollectorService    identityCollectorService,
             AggregateUpdateService      aggregateUpdateService,
             BehaviorFeatureService      behaviorFeatureService,
-            GraphFeatureService         graphFeatureService
+            GraphFeatureService         graphFeatureService,
+            EifService eifService
     ) {
         this.repository             = repository;
         this.nodeEnrichedService    = nodeEnrichedService;
@@ -49,6 +51,7 @@ public class TransactionService {
         this.aggregateUpdateService = aggregateUpdateService;
         this.behaviorFeatureService = behaviorFeatureService;
         this.graphFeatureService    = graphFeatureService;
+        this.eifService=eifService;
     }
 
     public Mono<Transaction> createTransaction(TransactionRequest request, String ja3) {
@@ -112,6 +115,14 @@ public class TransactionService {
                                                 Boolean.TRUE.equals(savedTx.getIsNewDevice()),
                                                 Boolean.TRUE.equals(savedTx.getIsNewJa3())
                                         );
+                                        List<Double> eifFeatures = List.of(
+                                                behavior.getTransactionVelocityScore(),
+                                                behavior.getBurstScore(),
+                                                (double) graph.getSuspiciousNeighborCount(),
+                                                (double) identity.getJa3ReuseCount(),
+                                                (double) identity.getDeviceReuseCount(),
+                                                (double) identity.getIpReuseCount()
+                                        );
 
                                         System.out.printf("📦 ML PAYLOAD: account=%s velocity=%.1f burst=%.1f suspiciousNeighbors=%d%n",
                                                 sourceAcc,
@@ -127,16 +138,46 @@ public class TransactionService {
                                         ).subscribe();
 
                                         // ── Step 7: AI engine call ────────────
-                                        return aiRiskService.analyzeTransaction(sourceNodeId, targetNodeId, amount,behavior,graph,identity)
-                                                .defaultIfEmpty(new AiRiskResult())
-                                                .doOnNext(aiResult -> {
-                                                    // Store GNN score so combineRiskSignals can read it
-                                                    savedTx.setRiskScore(aiResult.getRiskScore());
-                                                    savedTx.setUnsupervisedModelName(aiResult.getModelVersion());
-                                                    savedTx.setUnsupervisedScore(aiResult.getUnsupervisedScore());
-                                                    savedTx.setLinkedAccounts(aiResult.getLinkedAccounts());
+                                        // ── Step 7: AI + EIF in parallel ────────────
+
+                                                Mono<EifResponse> eifMono =
+                                                        eifService.score(eifFeatures)
+                                                                .timeout(Duration.ofMillis(1000))
+                                                                .onErrorReturn(new EifResponse());
+                                                return Mono.zip(
+                                                        aiRiskService.analyzeTransaction(sourceNodeId, targetNodeId, amount, behavior, graph, identity)
+                                                                .defaultIfEmpty(new AiRiskResult()),
+                                                        eifMono
+                                                ).flatMap(tuple -> {
+
+                                                AiRiskResult aiResult = tuple.getT1();
+                                                EifResponse eifResp = tuple.getT2();
+
+                                                double eifScore = eifResp.getScore();
+                                                Map<String, Double> eifFactors = eifResp.getTopFactors();
+
+                                                // store GNN result
+                                                savedTx.setGnnScore(aiResult.getRiskScore());
+                                                savedTx.setGnnConfidence(aiResult.getConfidence());
+                                                savedTx.setUnsupervisedModelName(aiResult.getModelVersion());
+                                                savedTx.setLinkedAccounts(aiResult.getLinkedAccounts());
+                                                System.out.println("GNN SCORE: " + aiResult.getRiskScore());
+                                                System.out.println("GNN CONFIDENCE: " + aiResult.getConfidence());
+
+                                                // store EIF result
+                                                
+                                                savedTx.setUnsupervisedScore(eifScore);
+
+                                                if (eifFactors != null) {
+                                                savedTx.setEifTopFactors(eifFactors.toString());
+                                                }
+
+                                                if (eifResp.getExplanation() != null) {
+                                                savedTx.setEifExplanation(eifResp.getExplanation());
+                                                }
+
+                                                return Mono.just(savedTx);
                                                 })
-                                                .thenReturn(savedTx)
                                                 .flatMap(tx2 ->
                                                         ja3SecurityService.callJa3Risk(tx2, ja3)
                                                                 .defaultIfEmpty(new HashMap<>())
@@ -166,8 +207,9 @@ public class TransactionService {
                                     BehaviorFeaturesDTO behavior,
                                     GraphFeaturesDTO graph) {
 
-        double gnnScore = tx.getRiskScore() == null ? 0.0 : tx.getRiskScore();
+        double gnnScore = tx.getGnnScore() == null ? 0.0 : tx.getGnnScore();
         double eifScore = tx.getUnsupervisedScore() == null ? 0.0 : tx.getUnsupervisedScore();
+        System.out.println("EIF SCORE FROM PYTHON: " + eifScore);
         double ja3Score = tx.getJa3Risk() == null ? 0.0 : tx.getJa3Risk();
 
         double velocity = behavior.getTransactionVelocityScore();

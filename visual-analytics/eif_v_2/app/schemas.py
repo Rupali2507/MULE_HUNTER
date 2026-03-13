@@ -11,3 +11,10 @@ class ScoreResponse(BaseModel):
     score: float
     isAnomalous: int
     confidence: float
+
+
+
+
+class EIFRequest(BaseModel):
+    features: List[float]
+
