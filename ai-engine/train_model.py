@@ -12,6 +12,20 @@ Architecture: GraphSAGE + GAT Hybrid with:
 """
 
 import os
+"""
+MuleHunter AI - Elite GNN Trainer
+=======================================
+Architecture: GraphSAGE + GAT Hybrid with:
+- 3-layer deep GNN (SAGE → GAT → SAGE)
+- Batch Normalization + Dropout regularization
+- Focal Loss for severe class imbalance
+- NeighborLoader mini-batch training (scales to millions of nodes)
+- F1-score based early stopping
+- Comprehensive evaluation: Precision / Recall / F1 / AUC-ROC
+- Model versioning and checkpoint saving
+"""
+
+import os
 import json
 import logging
 from pathlib import Path
