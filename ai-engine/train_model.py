@@ -1,17 +1,17 @@
 """
-MuleHunter AI  ·  GNN Trainer  
+MuleHunter AI  ·  GNN Trainer  ·  v5.0
 ========================================
 Architecture: GraphSAGE + GAT Hybrid
 
   Layer 1 → SAGEConv  (broad neighbourhood aggregation)
   Layer 2 → GATConv   (attention-weighted neighbour selection)
   Layer 3 → SAGEConv  (final aggregation before classification)
-  Head    → 2-layer MLP with BatchNorm + Dropout
+  Head    → 3-layer MLP with BatchNorm + Dropout
   Skip    → Residual connection from input → layer-3 output
 
-Regularisation  : FocalLoss (α=0.75, γ=2.0) + Dropout + weight decay
-Scheduler       : CosineAnnealingLR with warm restarts
-Early stopping  : F1-score based, patience=40 epochs
+Loss            : Weighted CrossEntropy (frequency-inverse weights)
+Scheduler       : ReduceLROnPlateau (monitors val AUC)
+Early stopping  : AUC-based with 150-epoch warm-up, patience=80
 
 """
 
@@ -27,7 +27,6 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from sklearn.metrics import (
-    classification_report,
     confusion_matrix,
     f1_score,
     precision_recall_curve,
@@ -35,7 +34,6 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
-from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from torch_geometric.data import Data
 from torch_geometric.nn import BatchNorm, GATConv, SAGEConv
 
@@ -51,7 +49,7 @@ logger = logging.getLogger("MuleHunter-Trainer")
 if os.path.exists("/app/shared-data"):
     SHARED_DATA = Path("/app/shared-data")
 else:
-    BASE_DIR = Path(__file__).resolve().parent
+    BASE_DIR    = Path(__file__).resolve().parent
     SHARED_DATA = BASE_DIR.parent / "shared-data"
 
 MODEL_PATH  = SHARED_DATA / "mule_model.pth"
@@ -59,43 +57,12 @@ GRAPH_PATH  = SHARED_DATA / "processed_graph.pt"
 EVAL_REPORT = SHARED_DATA / "eval_report.json"
 MODEL_META  = SHARED_DATA / "model_meta.json"
 
-HIDDEN_CHANNELS = 64
+HIDDEN_CHANNELS = 128
 OUT_CHANNELS    = 2
-MAX_EPOCHS      = 500
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# FOCAL LOSS
-# ──────────────────────────────────────────────────────────────────────────────
-
-class FocalLoss(torch.nn.Module):
-    """
-    Focal Loss: down-weights easy negatives, focuses on hard positives.
-    Critical for fraud detection with 3–5 % fraud prevalence.
-
-    [FIX 2] alpha/gamma scalars are registered as buffers so they are
-    automatically moved to the correct device with .to(device).
-    """
-
-    def __init__(self, alpha: float = 0.75, gamma: float = 2.0) -> None:
-        super().__init__()
-        self.register_buffer("alpha_val", torch.tensor(alpha))
-        self.register_buffer("gamma_val", torch.tensor(gamma))
-
-    def forward(
-        self,
-        log_probs: torch.Tensor,
-        targets: torch.Tensor,
-    ) -> torch.Tensor:
-        ce      = F.nll_loss(log_probs, targets, reduction="none")
-        pt      = torch.exp(-ce)
-        alpha_t = torch.where(
-            targets == 1,
-            self.alpha_val.expand_as(targets.float()),
-            (1.0 - self.alpha_val).expand_as(targets.float()),
-        )
-        focal = alpha_t * (1.0 - pt) ** self.gamma_val * ce
-        return focal.mean()
+MAX_EPOCHS      = 1000   # hard ceiling; early stopping will fire well before this
+WARMUP_EPOCHS   = 200    # [F2] no early stopping before this epoch
+PATIENCE_EPOCHS = 80     # [F5] stop if AUC hasn't improved for this many epochs
+CHECK_INTERVAL  = 5      # evaluate every N epochs
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -104,13 +71,10 @@ class FocalLoss(torch.nn.Module):
 
 class MuleHunterGNN(torch.nn.Module):
     """
-    3-layer hybrid GNN (SAGE → GAT → SAGE) with residual connection.
+    SAGE → GAT(4 heads) → SAGE with residual skip connection.
 
-    Parameters
-    ----------
-    in_channels : int   — inferred from data.x.shape[1]  [FIX 6]
-    hidden      : int   — hidden dimension (default 64)
-    out         : int   — number of classes (2: safe / fraud)
+    [F6] Dropout reduced to 0.10 on GNN layers and 0.15/0.05 in the
+    head. On a 7k-node graph heavy dropout destroys minority-class signal.
     """
 
     def __init__(
@@ -126,21 +90,23 @@ class MuleHunterGNN(torch.nn.Module):
 
         self.conv2 = GATConv(
             hidden, hidden, heads=4, concat=False,
-            dropout=0.3, add_self_loops=False,
+            dropout=0.10, add_self_loops=False,
         )
         self.bn2 = BatchNorm(hidden)
 
         self.conv3 = SAGEConv(hidden, hidden // 2)
         self.bn3   = BatchNorm(hidden // 2)
 
-        # Skip connection: project input → layer-3 output space
         self.skip = torch.nn.Linear(in_channels, hidden // 2)
 
-        # Classification head
         self.classifier = torch.nn.Sequential(
-            torch.nn.Linear(hidden // 2, 32),
+            torch.nn.Linear(hidden // 2, 64),
+            torch.nn.BatchNorm1d(64),
             torch.nn.ReLU(),
-            torch.nn.Dropout(0.4),
+            torch.nn.Dropout(0.15),
+            torch.nn.Linear(64, 32),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(0.05),
             torch.nn.Linear(32, out),
         )
 
@@ -155,20 +121,20 @@ class MuleHunterGNN(torch.nn.Module):
 
     def forward(
         self,
-        x: torch.Tensor,
+        x:          torch.Tensor,
         edge_index: torch.Tensor,
         return_embedding: bool = False,
     ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         identity = self.skip(x)
 
         x = F.relu(self.bn1(self.conv1(x, edge_index)))
-        x = F.dropout(x, p=0.3, training=self.training)
+        x = F.dropout(x, p=0.10, training=self.training)
 
         x = F.relu(self.bn2(self.conv2(x, edge_index)))
-        x = F.dropout(x, p=0.3, training=self.training)
+        x = F.dropout(x, p=0.10, training=self.training)
 
         x = F.relu(self.bn3(self.conv3(x, edge_index)))
-        embedding = x + identity  # residual
+        embedding = x + identity
 
         logits = F.log_softmax(self.classifier(embedding), dim=1)
         if return_embedding:
@@ -177,7 +143,7 @@ class MuleHunterGNN(torch.nn.Module):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# EVALUATION HELPERS
+# EVALUATION
 # ──────────────────────────────────────────────────────────────────────────────
 
 def evaluate(
@@ -193,14 +159,14 @@ def evaluate(
         pred = (prob >= threshold).astype(int)
         true = data.y[mask].cpu().numpy()
 
-    has_both_classes = len(np.unique(true)) > 1
+    has_both = len(np.unique(true)) > 1
     return {
-        "f1":             float(f1_score(true, pred, zero_division=0)),
-        "precision":      float(precision_score(true, pred, zero_division=0)),
-        "recall":         float(recall_score(true, pred, zero_division=0)),
-        "auc_roc":        float(roc_auc_score(true, prob)) if has_both_classes else 0.0,
+        "f1":               float(f1_score(true, pred, zero_division=0)),
+        "precision":        float(precision_score(true, pred, zero_division=0)),
+        "recall":           float(recall_score(true, pred, zero_division=0)),
+        "auc_roc":          float(roc_auc_score(true, prob)) if has_both else 0.5,
         "confusion_matrix": confusion_matrix(true, pred).tolist(),
-        "threshold_used": float(threshold),
+        "threshold_used":   float(threshold),
     }
 
 
@@ -209,11 +175,7 @@ def find_best_threshold(
     data:  Data,
     mask:  torch.Tensor,
 ) -> tuple[float, float]:
-    """
-    Find the decision threshold maximising F1 on the given split.
-
-    [FIX 5] Edge-case guard: if no threshold yields F1 > 0, return 0.5.
-    """
+    """Return (threshold, f1) that maximises F1 on the given mask."""
     model.eval()
     with torch.no_grad():
         out  = model(data.x, data.edge_index)
@@ -224,29 +186,22 @@ def find_best_threshold(
         return 0.5, 0.0
 
     prec, rec, thresholds = precision_recall_curve(true, prob)
-    denom = prec[:-1] + rec[:-1]
-    f1_scores = np.where(
-        denom > 0,
-        2.0 * prec[:-1] * rec[:-1] / denom,
-        0.0,
-    )
+    denom     = prec[:-1] + rec[:-1]
+    f1_scores = np.where(denom > 0, 2.0 * prec[:-1] * rec[:-1] / denom, 0.0)
 
     if f1_scores.max() == 0.0:
         logger.warning("  No threshold yields F1 > 0 — defaulting to 0.5")
         return 0.5, 0.0
 
     best_idx    = int(f1_scores.argmax())
-    best_thresh = float(thresholds[best_idx])
+    best_thresh = float(np.clip(thresholds[best_idx], 0.01, 0.99))
     best_f1     = float(f1_scores[best_idx])
-    logger.info(
-        "  Optimal threshold: %.4f  (F1=%.4f vs default=0.5)",
-        best_thresh, best_f1,
-    )
+    logger.info("  Optimal threshold: %.4f  (val F1=%.4f)", best_thresh, best_f1)
     return best_thresh, best_f1
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# TRAINING LOOP
+# TRAINING
 # ──────────────────────────────────────────────────────────────────────────────
 
 def train() -> None:
@@ -255,9 +210,9 @@ def train() -> None:
     random.seed(42)
     torch.backends.cudnn.deterministic = True
 
-    logger.info("=" * 60)
-    logger.info("MuleHunter GNN Trainer v3.0")
-    logger.info("=" * 60)
+    logger.info("=" * 65)
+    logger.info("MuleHunter GNN Trainer v5.0")
+    logger.info("=" * 65)
 
     if not GRAPH_PATH.exists():
         raise FileNotFoundError(
@@ -265,37 +220,73 @@ def train() -> None:
         )
 
     data = torch.load(GRAPH_PATH, map_location="cpu", weights_only=False)
-    logger.info("  Nodes: %s | Edges: %s", f"{data.num_nodes:,}", f"{data.edge_index.shape[1]:,}")
+
+    n_fraud = int(data.y.sum())
+    n_total = int(data.y.shape[0])
+    n_safe  = n_total - n_fraud
     logger.info(
-        "  Features: %d | Fraud nodes: %s",
-        data.x.shape[1], f"{int(data.y.sum()):,}",
+        "  Nodes: %s | Edges: %s | Features: %d",
+        f"{n_total:,}", f"{data.edge_index.shape[1]:,}", data.x.shape[1],
+    )
+    logger.info(
+        "  Class balance → safe: %s | fraud: %s (%.1f%%)",
+        f"{n_safe:,}", f"{n_fraud:,}", 100.0 * n_fraud / n_total,
     )
 
     in_channels = data.x.shape[1]
-
-    device    = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device      = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info("  Device: %s", device)
 
-    data      = data.to(device)
-    model     = MuleHunterGNN(in_channels=in_channels).to(device)
-    criterion = FocalLoss(alpha=0.75, gamma=2.0).to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=5e-3, weight_decay=1e-4)
+    data  = data.to(device)
+    model = MuleHunterGNN(in_channels=in_channels).to(device)
 
-    # Restarts at epoch 100, 300, 700 — covers 500 training epochs well.
-    scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=100, T_mult=2, eta_min=1e-5)
+    # ── [F3/F4] Weighted CrossEntropy — weights from training split only ───────
+    train_labels = data.y[data.train_mask]
+    n_tr_pos     = int((train_labels == 1).sum())
+    n_tr_neg     = int((train_labels == 0).sum())
+    n_tr_total   = n_tr_pos + n_tr_neg
 
-    # ── Training ──────────────────────────────────────────────────────────────
-    best_val_f1      = 0.0
-    patience_epochs  = 40   # stop if no improvement for 40 epochs
-    patience_strikes = 0
-    history          = []
+    # w_i = n_total / (n_classes * n_class_i)  — sklearn convention
+    w_neg = n_tr_total / (2.0 * n_tr_neg)
+    w_pos = n_tr_total / (2.0 * n_tr_pos)
+    class_weights = torch.tensor([w_neg, w_pos], dtype=torch.float, device=device)
 
-    header = f"{'Epoch':>6} | {'Loss':>8} | {'Val F1':>8} | {'Val AUC':>8} | {'Prec':>7} | {'Rec':>7}"
-    logger.info("\n%s\n%s", header, "-" * len(header))
+    logger.info(
+        "  Training split → safe: %d | fraud: %d | w_safe=%.3f | w_fraud=%.3f",
+        n_tr_neg, n_tr_pos, w_neg, w_pos,
+    )
 
-    check_interval = 10
+    # NLLLoss works with log-softmax outputs (what the model returns)
+    criterion = torch.nn.NLLLoss(weight=class_weights)
+
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
+
+    # [F8] ReduceLROnPlateau: reduce LR by 0.5 if AUC stalls for 20 checks
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="max", factor=0.5, patience=20,
+        min_lr=1e-6, verbose=False,
+    )
+
+    # ── Training loop ─────────────────────────────────────────────────────────
+    best_val_auc     = 0.0   # [F1] track AUC, not F1
+    best_val_f1      = 0.0   # also track F1 for logging
+    epochs_no_improve = 0    # [F5] raw epoch counter, not strikes×interval
+    history: list[dict] = []
+
+    header = (
+        f"{'Epoch':>6} | {'Loss':>8} | {'ValAUC':>8} | "
+        f"{'Val F1':>8} | {'Prec':>7} | {'Rec':>7} | {'LR':>9}"
+    )
+    logger.info("\n%s\n%s", header, "─" * len(header))
 
     for epoch in range(1, MAX_EPOCHS + 1):
+
+        # [F7] LR warm-up: scale LR linearly for first 20 epochs
+        if epoch <= 20:
+            warmup_factor = epoch / 20.0
+            for pg in optimizer.param_groups:
+                pg["lr"] = 1e-3 * warmup_factor
+
         model.train()
         optimizer.zero_grad()
         out  = model(data.x, data.edge_index)
@@ -303,35 +294,50 @@ def train() -> None:
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
-        scheduler.step(epoch)
 
-        if epoch % check_interval == 0:
-            val_metrics = evaluate(model, data, data.val_mask)
-            history.append({"epoch": epoch, "loss": float(loss), **val_metrics})
+        if epoch % CHECK_INTERVAL == 0:
+            val_m   = evaluate(model, data, data.val_mask)
+            cur_lr  = optimizer.param_groups[0]["lr"]
+            history.append({"epoch": epoch, "loss": float(loss), "lr": cur_lr, **val_m})
 
             logger.info(
-                "%6d | %8.4f | %8.4f | %8.4f | %7.4f | %7.4f",
-                epoch, loss.item(),
-                val_metrics["f1"], val_metrics["auc_roc"],
-                val_metrics["precision"], val_metrics["recall"],
+                "%6d | %8.4f | %8.4f | %8.4f | %7.4f | %7.4f | %9.2e",
+                epoch, float(loss),
+                val_m["auc_roc"], val_m["f1"],
+                val_m["precision"], val_m["recall"],
+                cur_lr,
             )
 
-            if val_metrics["f1"] > best_val_f1:
-                best_val_f1      = val_metrics["f1"]
-                patience_strikes = 0
+            # [F8] Feed AUC into plateau scheduler (only after warmup)
+            if epoch > 20:
+                scheduler.step(val_m["auc_roc"])
+
+            # [F1] Track best AUC; also save best F1 for reporting
+            if val_m["auc_roc"] > best_val_auc:
+                best_val_auc = val_m["auc_roc"]
+                best_val_f1  = val_m["f1"]
+                epochs_no_improve = 0
                 torch.save(model.state_dict(), MODEL_PATH)
-                logger.info("  ✓ New best val F1=%.4f — checkpoint saved", best_val_f1)
+                logger.info(
+                    "  ✓ Best AUC=%.4f  F1=%.4f  (prec=%.4f rec=%.4f) — saved",
+                    best_val_auc, best_val_f1,
+                    val_m["precision"], val_m["recall"],
+                )
             else:
-                patience_strikes += 1
-                if patience_strikes * check_interval >= patience_epochs:
-                    logger.info("  Early stopping at epoch %d", epoch)
-                    break
+                # [F2] Only count towards patience AFTER warm-up period
+                if epoch > WARMUP_EPOCHS:
+                    epochs_no_improve += CHECK_INTERVAL
+                    if epochs_no_improve >= PATIENCE_EPOCHS:
+                        logger.info(
+                            "  Early stopping at epoch %d  "
+                            "(no AUC improvement for %d epochs)",
+                            epoch, PATIENCE_EPOCHS,
+                        )
+                        break
 
     # ── Final evaluation ──────────────────────────────────────────────────────
     logger.info("\nLoading best checkpoint for final test evaluation...")
-    model.load_state_dict(
-        torch.load(MODEL_PATH, map_location=device)
-    )
+    model.load_state_dict(torch.load(MODEL_PATH, map_location=device, weights_only=True))
 
     best_thresh, _ = find_best_threshold(model, data, data.val_mask)
 
@@ -339,21 +345,18 @@ def train() -> None:
     val_metrics_fin = evaluate(model, data, data.val_mask,  threshold=best_thresh)
     test_default    = evaluate(model, data, data.test_mask, threshold=0.5)
 
-    logger.info("\n%s", "=" * 60)
+    logger.info("\n%s", "=" * 65)
     logger.info("FINAL EVALUATION REPORT")
-    logger.info("=" * 60)
+    logger.info("=" * 65)
     for k, v in test_metrics.items():
         if k not in ("confusion_matrix", "threshold_used"):
             logger.info("  Test %-20s: %.4f", k.upper(), v)
-
+    logger.info("  Threshold used           : %.4f  (tuned on val set)", best_thresh)
     logger.info(
-        "  Threshold (tuned / default): %.4f / 0.5000",
-        best_thresh,
+        "  Default-0.5 F1           : %.4f  ← tuned F1: %.4f",
+        test_default["f1"], test_metrics["f1"],
     )
-    logger.info(
-        "  Default-threshold F1:        %.4f",
-        test_default["f1"],
-    )
+    logger.info("  Best val AUC (training)  : %.4f", best_val_auc)
 
     cm = np.array(test_metrics["confusion_matrix"])
     logger.info(
@@ -362,13 +365,13 @@ def train() -> None:
         "    FN=%6d  TP=%6d",
         cm[0, 0], cm[0, 1], cm[1, 0], cm[1, 1],
     )
-    logger.info("  Best Val F1: %.4f", best_val_f1)
 
-    # ── Persist artifacts ─────────────────────────────────────────────────────
+    # ── Save artifacts ────────────────────────────────────────────────────────
     report = {
         "test":                   test_metrics,
         "val":                    val_metrics_fin,
         "test_default_threshold": test_default,
+        "best_val_auc":           best_val_auc,
         "best_val_f1":            best_val_f1,
         "optimal_threshold":      best_thresh,
         "training_history":       history,
@@ -376,15 +379,18 @@ def train() -> None:
             "in_channels":     in_channels,
             "hidden_channels": HIDDEN_CHANNELS,
             "architecture":    "SAGE→GAT(4heads)→SAGE + Residual",
-            "loss":            "FocalLoss(alpha=0.75, gamma=2.0)",
-            "optimizer":       "AdamW + CosineAnnealingWarmRestarts(T0=100)",
+            "loss":            f"WeightedNLLLoss(w_safe={w_neg:.3f}, w_fraud={w_pos:.3f})",
+            "optimizer":       "AdamW(lr=1e-3→ReduceLROnPlateau, wd=1e-4)",
+            "class_counts":    {"safe": n_tr_neg, "fraud": n_tr_pos},
+            "warmup_epochs":   WARMUP_EPOCHS,
+            "patience_epochs": PATIENCE_EPOCHS,
         },
     }
     with open(EVAL_REPORT, "w") as f:
         json.dump(report, f, indent=2)
 
     meta = {
-        "version":           "MuleHunter-V3",
+        "version":           "MuleHunter-V5",
         "in_channels":       in_channels,
         "hidden_channels":   HIDDEN_CHANNELS,
         "test_f1":           test_metrics["f1"],
@@ -396,9 +402,9 @@ def train() -> None:
     with open(MODEL_META, "w") as f:
         json.dump(meta, f, indent=2)
 
-    logger.info("\nModel saved     → %s", MODEL_PATH)
-    logger.info("Eval report     → %s", EVAL_REPORT)
-    logger.info("TRAINING COMPLETE")
+    logger.info("\nModel  → %s", MODEL_PATH)
+    logger.info("Report → %s", EVAL_REPORT)
+    logger.info("TRAINING COMPLETE — MuleHunter V5")
 
 
 if __name__ == "__main__":

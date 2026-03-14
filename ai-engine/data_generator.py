@@ -1,5 +1,5 @@
 """
-MuleHunter AI  ·  Data Generator  
+MuleHunter AI  ·  Data Generator  ·  v3.0
 ==========================================
 Transforms the IEEE-CIS Kaggle dataset into a rich fraud graph with:
 
@@ -168,6 +168,7 @@ def engineer_node_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     logger.info("Engineering 15-dimensional node feature space...")
 
+    # ── Card identity composite key ───────────────────────────────────────────
     df = df.copy()
     df["user_id"] = (
         df["card1"].astype(str) + "_" +
@@ -175,6 +176,7 @@ def engineer_node_features(df: pd.DataFrame) -> pd.DataFrame:
         df["card6"].fillna("X").astype(str)
     )
 
+    # ── Core aggregations ─────────────────────────────────────────────────────
     agg = df.groupby("user_id").agg(
         account_age_days=("D1",             lambda x: x.fillna(0).mean()),
         balance_mean    =("TransactionAmt", "mean"),
@@ -184,6 +186,9 @@ def engineer_node_features(df: pd.DataFrame) -> pd.DataFrame:
     ).reset_index()
     agg["balance_std"] = agg["balance_std"].fillna(0)
 
+    # ── [FIX 1] tx_velocity_7d: vectorised window via max_dt merge ─────────────
+    # Compute per-user max TransactionDT, merge back, flag recent rows,
+    # then group-count — no slow apply() needed.
     max_dt = (
         df.groupby("user_id")["TransactionDT"]
         .max()
@@ -198,6 +203,7 @@ def engineer_node_features(df: pd.DataFrame) -> pd.DataFrame:
     )
     agg = agg.merge(velocity, on="user_id", how="left")
 
+    # ── [FIX 3] fan_out_ratio ─────────────────────────────────────────────────
     unique_targets = (
         df.groupby("user_id")["addr1"]
         .nunique()
@@ -208,6 +214,7 @@ def engineer_node_features(df: pd.DataFrame) -> pd.DataFrame:
         agg["unique_targets"] / (agg["tx_count"] + 1)
     ).clip(0, 1)
 
+    # ── [FIX 3] amount_entropy with adaptive bucketing ─────────────────────────
     entropy_map = (
         df.groupby("user_id")["TransactionAmt"]
         .apply(_safe_entropy)
@@ -215,6 +222,7 @@ def engineer_node_features(df: pd.DataFrame) -> pd.DataFrame:
     )
     agg = agg.merge(entropy_map, on="user_id", how="left")
 
+    # ── [FIX 7/2] Email domain risk — extract domain first ────────────────────
     if "P_emaildomain" in df.columns:
         email_map = (
             df.groupby("user_id")["P_emaildomain"]
@@ -232,6 +240,7 @@ def engineer_node_features(df: pd.DataFrame) -> pd.DataFrame:
             .apply(lambda x: (x.str.lower() == "mobile").mean())
             .reset_index(name="device_mobile")
         )
+        # [FIX 4] device_consistency: clip to [0,1] to handle edge cases
         consistency_map = (
             df.groupby("user_id")["DeviceType"]
             .apply(lambda x: float(np.clip(1.0 - x.nunique() / max(len(x), 1), 0.0, 1.0)))
@@ -243,6 +252,7 @@ def engineer_node_features(df: pd.DataFrame) -> pd.DataFrame:
         agg["device_mobile"]      = 0.5
         agg["device_consistency"] = 1.0
 
+    # ── [FIX 5] Address entropy ───────────────────────────────────────────────
     addr_ent = (
         df.groupby("user_id")["addr1"]
         .apply(_safe_addr_entropy)
@@ -296,7 +306,9 @@ def engineer_node_features(df: pd.DataFrame) -> pd.DataFrame:
     else:
         agg["product_code_risk"] = 0.3
 
-   
+    # ── [FIX 6] International transactions — continuous ratio ─────────────────
+    # card3 encodes geographic bin in IEEE-CIS; values > 150 → non-US geography.
+    # We express this as a ratio [0,1] rather than a boolean.
     if "card3" in df.columns:
         intl_map = (
             df.groupby("user_id")["card3"]
@@ -307,7 +319,10 @@ def engineer_node_features(df: pd.DataFrame) -> pd.DataFrame:
     else:
         agg["international_flag"] = 0.0
 
-    
+    # ── [NEW] second_hop_fraud_rate seed (graph-level feature, pre-computed) ──
+    # For each account, what fraction of its direct neighbours (via addr1)
+    # are fraudulent?  This is a cheap proxy for graph-propagated risk and
+    # lets feature_engineering.py skip one expensive full-graph pass.
     fraud_by_addr = (
         df.groupby("addr1")["isFraud"]
         .max()
@@ -335,18 +350,34 @@ def engineer_node_features(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# EDGE BUILDING
+# EDGE BUILDING  —  account-to-account co-occurrence edges
 # ──────────────────────────────────────────────────────────────────────────────
 
 def build_edges(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Build directed transaction edges with metadata.
+    Build ACCOUNT-TO-ACCOUNT edges so the GNN has a real graph to learn from.
 
-    Source  : card composite key (payer account)
-    Target  : loc_<addr1>       (merchant / location node)
-    Weights : TransactionAmt    (used as edge weight in the GNN)
+    The previous version wrote account → loc_<addr1> edges.  Because location
+    nodes never appear in nodes.csv, every target mapped to NaN inside
+    feature_engineering.py's node_mapping, so valid was all-False and
+    edge_index ended up with 0 edges.  The GNN therefore ran as a pure MLP
+    with no message-passing whatsoever.
+
+    Strategy — co-occurrence edges:
+      Two accounts share an edge when they have a common attribute that fraud
+      rings exploit:
+        • shared_addr   : same billing address (addr1) — geographic co-location
+        • shared_card   : same card BIN prefix (card1) — issuer batch cluster
+        • shared_device : same DeviceInfo string — same physical device used for
+                          multiple accounts (strongest mule signal)
+
+    Edge weight: sum of transaction amounts across the shared group (flow proxy).
+
+    MAX_GROUP_SIZE caps how many accounts can link via one shared value to
+    prevent mega-cliques (e.g. NaN address, popular BIN) from producing O(N²)
+    edges and blowing up memory.
     """
-    logger.info("Building directed transaction graph edges...")
+    logger.info("Building account-to-account co-occurrence edges...")
 
     df = df.copy()
     df["user_id"] = (
@@ -354,15 +385,83 @@ def build_edges(df: pd.DataFrame) -> pd.DataFrame:
         df["card4"].fillna("X").astype(str) + "_" +
         df["card6"].fillna("X").astype(str)
     )
-    df["target_id"] = "loc_" + df["addr1"].fillna(0).astype(int).astype(str)
 
-    edges = df[[
-        "user_id", "target_id", "TransactionAmt",
-        "TransactionDT", "isFraud",
-    ]].copy()
-    edges.columns = ["source", "target", "amount", "timestamp", "is_fraud_edge"]
+    MAX_GROUP_SIZE = 20
+    all_edges: list[dict] = []
 
-    logger.info("  %s edges built", f"{len(edges):,}")
+    def _cooccurrence(group_col: str, edge_type: str) -> None:
+        """Emit bidirectional edges between accounts sharing group_col value."""
+        col_series = df[group_col]
+        # Drop nulls and empty strings
+        valid_mask = col_series.notna() & (col_series.astype(str).str.strip() != "")
+        sub = df[valid_mask][["user_id", group_col, "TransactionAmt"]].copy()
+        sub[group_col] = sub[group_col].astype(str)
+
+        # Per-group, per-account total flow
+        flow = (
+            sub.groupby([group_col, "user_id"])["TransactionAmt"]
+            .sum()
+            .reset_index()
+        )
+
+        for gval, grp in flow.groupby(group_col):
+            members = grp["user_id"].values
+            if len(members) < 2:
+                continue
+            # Cap large groups: keep top-flow accounts
+            if len(members) > MAX_GROUP_SIZE:
+                top_idx = grp["TransactionAmt"].nlargest(MAX_GROUP_SIZE).index
+                members = grp.loc[top_idx, "user_id"].values
+            avg_w = float(grp.loc[grp["user_id"].isin(members), "TransactionAmt"].mean())
+            # Bidirectional edges for every pair in this group
+            for i in range(len(members)):
+                for j in range(i + 1, len(members)):
+                    src, tgt = str(members[i]), str(members[j])
+                    all_edges.append({"source": src, "target": tgt,
+                                      "amount": avg_w, "is_fraud_edge": 0})
+                    all_edges.append({"source": tgt, "target": src,
+                                      "amount": avg_w, "is_fraud_edge": 0})
+
+    if "addr1" in df.columns:
+        _cooccurrence("addr1", "shared_addr")
+
+    if "card1" in df.columns:
+        _cooccurrence("card1", "shared_card")
+
+    if "DeviceInfo" in df.columns:
+        # Strip out generic device values that would create spurious mass-cliques
+        df_dev = df.copy()
+        df_dev["DeviceInfo"] = df_dev["DeviceInfo"].astype(str).str.strip()
+        generic = {"nan", "unknown", "", "windows", "ios", "android",
+                   "macintel", "linux", "other"}
+        df_dev = df_dev[~df_dev["DeviceInfo"].str.lower().isin(generic)]
+        if len(df_dev) > 0:
+            # Temporarily replace df so _cooccurrence uses the filtered version
+            orig, df = df, df_dev
+            _cooccurrence("DeviceInfo", "shared_device")
+            df = orig
+
+    if not all_edges:
+        logger.warning(
+            "  No account-to-account edges produced — "
+            "check that addr1/card1 columns exist in your dataset"
+        )
+        return pd.DataFrame(columns=["source", "target", "amount", "is_fraud_edge"])
+
+    edges = pd.DataFrame(all_edges)
+
+    # Deduplicate same-pair edges (can appear from multiple shared attributes)
+    # Keep the maximum weight across all edge types for the same (src, tgt) pair
+    edges = (
+        edges.groupby(["source", "target"], as_index=False)
+        .agg(amount=("amount", "max"), is_fraud_edge=("is_fraud_edge", "max"))
+    )
+
+    logger.info(
+        "  %s account-to-account edges built (%s unique pairs)",
+        f"{len(edges):,}",
+        f"{len(edges):,}",
+    )
     return edges
 
 

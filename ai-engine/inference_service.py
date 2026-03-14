@@ -33,7 +33,6 @@ import datetime
 import json
 import logging
 import os
-import signal
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -82,10 +81,18 @@ MAX_RINGS_CACHED = 200
 # ──────────────────────────────────────────────────────────────────────────────
 
 class MuleHunterGNN(torch.nn.Module):
+    """
+    Architecture must stay in sync with train_model.py exactly.
+    hidden_channels is read from model_meta.json at load time so a retrained
+    model with different dimensions loads correctly without code changes.
+
+    v5 architecture: hidden=128, GNN dropout=0.10, 3-layer head with BatchNorm.
+    """
+
     def __init__(
         self,
         in_channels: int,
-        hidden: int = 64,
+        hidden: int = 128,   # matches HIDDEN_CHANNELS in train_model.py
         out:    int = 2,
     ) -> None:
         super().__init__()
@@ -93,16 +100,21 @@ class MuleHunterGNN(torch.nn.Module):
         self.bn1   = BatchNorm(hidden)
         self.conv2 = GATConv(
             hidden, hidden, heads=4, concat=False,
-            dropout=0.3, add_self_loops=False,
+            dropout=0.10, add_self_loops=False,
         )
         self.bn2  = BatchNorm(hidden)
         self.conv3 = SAGEConv(hidden, hidden // 2)
         self.bn3   = BatchNorm(hidden // 2)
         self.skip  = torch.nn.Linear(in_channels, hidden // 2)
+        # Must match the Sequential in train_model.py classifier block exactly
         self.classifier = torch.nn.Sequential(
-            torch.nn.Linear(hidden // 2, 32),
+            torch.nn.Linear(hidden // 2, 64),
+            torch.nn.BatchNorm1d(64),
             torch.nn.ReLU(),
-            torch.nn.Dropout(0.4),
+            torch.nn.Dropout(0.15),
+            torch.nn.Linear(64, 32),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(0.05),
             torch.nn.Linear(32, out),
         )
 
@@ -114,9 +126,9 @@ class MuleHunterGNN(torch.nn.Module):
     ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         identity  = self.skip(x)
         x = F.relu(self.bn1(self.conv1(x, edge_index)))
-        x = F.dropout(x, p=0.3, training=self.training)
+        x = F.dropout(x, p=0.10, training=self.training)
         x = F.relu(self.bn2(self.conv2(x, edge_index)))
-        x = F.dropout(x, p=0.3, training=self.training)
+        x = F.dropout(x, p=0.10, training=self.training)
         x = F.relu(self.bn3(self.conv3(x, edge_index)))
         embedding = x + identity
         logits    = F.log_softmax(self.classifier(embedding), dim=1)
@@ -271,52 +283,51 @@ _init_lock   = Lock()
 # STARTUP
 # ──────────────────────────────────────────────────────────────────────────────
 
-class _TimeoutError(Exception):
-    pass
-
-
-def _alarm_handler(signum, frame):  # noqa: ANN001
-    raise _TimeoutError
-
-
 def _precache_rings(g: nx.DiGraph, account_nodes: set[str]) -> List[Dict[str, Any]]:
     """
-    [FIX 3] Build ring cache at startup bounded by RING_TIMEOUT_SEC.
-    Restricted to account nodes only so location nodes don't form spurious cycles.
+    Build ring cache at startup using a bounded DFS.
+
+    Uses time.monotonic() for the timeout so it works on Windows, macOS,
+    and Linux without relying on SIGALRM (which does not exist on Windows).
     """
-    rings: List[Dict[str, Any]] = []
-    subgraph = g.subgraph([n for n in g.nodes() if n in account_nodes]).copy()
+    import time
 
-    use_alarm = hasattr(signal, "SIGALRM")
-    if use_alarm:
-        signal.signal(signal.SIGALRM, _alarm_handler)
-        signal.alarm(RING_TIMEOUT_SEC)
+    rings: List[Dict[str, Any]]      = []
+    seen_ring_sets: set[frozenset]   = set()
+    sub      = g.subgraph([n for n in g.nodes() if n in account_nodes]).copy()
+    deadline = time.monotonic() + RING_TIMEOUT_SEC
 
-    try:
-        for cycle in nx.simple_cycles(subgraph):
-            if len(rings) >= MAX_RINGS_CACHED:
+    for start in list(sub.nodes()):
+        if time.monotonic() > deadline or len(rings) >= MAX_RINGS_CACHED:
+            break
+
+        stack = [(start, [start])]
+        while stack:
+            if time.monotonic() > deadline or len(rings) >= MAX_RINGS_CACHED:
                 break
-            if not (3 <= len(cycle) <= 6):
-                continue
-            vol = sum(
-                subgraph[cycle[i]][cycle[(i + 1) % len(cycle)]].get("weight", 0)
-                for i in range(len(cycle))
-            )
-            rings.append({
-                "nodes":  cycle,
-                "size":   len(cycle),
-                "volume": round(float(vol), 2),
-                "risk":   round(float(min(1.0, vol / 50_000)), 4),
-            })
-    except _TimeoutError:
-        logger.warning("Ring pre-cache timed out after %ds — %d rings cached", RING_TIMEOUT_SEC, len(rings))
-    except Exception as exc:
-        logger.warning("Ring pre-cache error: %s", exc)
-    finally:
-        if use_alarm:
-            signal.alarm(0)
+            node, path = stack.pop()
+            for nb in sub.successors(node):
+                if len(path) > 6:
+                    break
+                if nb == start and len(path) >= 3:
+                    key = frozenset(path)
+                    if key not in seen_ring_sets:
+                        seen_ring_sets.add(key)
+                        vol = sum(
+                            sub[path[i]][path[(i + 1) % len(path)]].get("weight", 0)
+                            for i in range(len(path))
+                        )
+                        rings.append({
+                            "nodes":  path[:],
+                            "size":   len(path),
+                            "volume": round(float(vol), 2),
+                            "risk":   round(float(min(1.0, vol / 50_000)), 4),
+                        })
+                elif nb not in path:
+                    stack.append((nb, path + [nb]))
 
     rings.sort(key=lambda r: r["volume"], reverse=True)
+    logger.info("Ring pre-cache complete: %d rings found", len(rings))
     return rings
 
 
@@ -374,18 +385,13 @@ def load_assets() -> None:
             rev_map = {i: nid for nid, i in id_map.items()}
             logger.info("  Metadata: %s nodes loaded", f"{len(node_df):,}")
 
-        # Load norm params  [FIX 1]
+        # Load norm params
         if NORM_PATH.exists():
             with open(NORM_PATH) as f:
                 norm_params = json.load(f)
             logger.info("  Norm params loaded for %d features", len(norm_params.get("feature_cols", [])))
         else:
             logger.warning("  norm_params.json not found — new-node scoring will use 0.5 neutral features")
-
-        # Load model meta
-        if META_PATH.exists():
-            with open(META_PATH) as f:
-                model_meta = json.load(f)
 
         # Build NetworkX graph (for ring detection + neighbour queries)
         tx_path = SHARED_DATA / "transactions.csv"
@@ -405,9 +411,16 @@ def load_assets() -> None:
             _rings_cache = _precache_rings(nx_graph, account_node_set)
             logger.info("  Cached %d rings", len(_rings_cache))
 
-        # Load and eval model
-        model = MuleHunterGNN(in_channels=actual_features)
-        model.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"))
+        # Load and eval model — read hidden_channels from meta so architecture
+        # stays correct even after a retrain with different dimensions
+        hidden_ch = 128  # default matching train_model.py HIDDEN_CHANNELS
+        if META_PATH.exists():
+            with open(META_PATH) as f:
+                model_meta = json.load(f)
+            hidden_ch = model_meta.get("hidden_channels", 128)
+
+        model = MuleHunterGNN(in_channels=actual_features, hidden=hidden_ch)
+        model.load_state_dict(torch.load(MODEL_PATH, map_location="cpu", weights_only=True))
         model.eval()
 
         # [FIX 2] Build logit cache (one forward pass for all nodes)
