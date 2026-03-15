@@ -463,16 +463,25 @@ def _infer_new_node(
     account_id: str,
 ) -> tuple[float, float, float]:
     """
-    [FIX 2] For nodes not seen during training: run a localised forward
-    pass using only the new node's feature vector appended to the graph.
-    This is much cheaper than re-running the full N-node forward pass.
+    Score a node that was not present during training.
+
+    The new node is appended to the feature matrix with neutral (0.5)
+    features but NO edges are added — the existing edge_index only covers
+    the training graph. This means the new node receives no message-passing
+    signal and is scored purely by the MLP head.  That produces a
+    conservatively neutral score (~0.3–0.5), which is the safest default
+    for an unknown account: don't flag it, don't clear it.
+
+    A proper k-hop subgraph inference would require knowing the new node's
+    real neighbours at request time, which the REST contract doesn't supply.
+    Spring Boot can compensate via the graphFeatures blend in /v1/gnn/score.
     """
     x          = base_graph.x.clone()
     edge_index = base_graph.edge_index.clone()
 
-    new_idx = x.size(0)
+    new_idx  = x.size(0)
     new_feat = _new_node_features(norm_params)
-    x = torch.cat([x, new_feat], dim=0)
+    x        = torch.cat([x, new_feat], dim=0)
 
     with torch.no_grad():
         logits, embeddings = model(x, edge_index, return_embedding=True)
@@ -485,13 +494,12 @@ def _infer_new_node(
 
 
 def _get_node_features(account_id: str) -> dict:
-    """Pull normalised feature values from node_df for explainability."""
+    """Pull feature values from node_df for explainability — O(1) via iloc."""
     if node_df is None or account_id not in id_map:
         return {}
-    row = node_df[node_df["node_id"] == account_id]
-    if row.empty:
-        return {}
-    r = row.iloc[0]
+    # id_map[account_id] is the positional index of this node in node_df
+    # (node_df rows are in the same order id_map was built, so iloc is safe)
+    r = node_df.iloc[id_map[account_id]]
     return {col: float(r[col]) for col in FEATURE_COLS if col in r.index}
 
 

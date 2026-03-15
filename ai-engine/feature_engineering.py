@@ -144,8 +144,10 @@ def detect_rings(
 
     deadline = time.monotonic() + timeout_sec
     nodes_list = list(sub.nodes())
+    nodes_checked = 0
 
     for start in nodes_list:
+        nodes_checked += 1
         if time.monotonic() > deadline:
             logger.warning(
                 "  Ring detection timed out after %ds — %d rings found",
@@ -188,11 +190,8 @@ def detect_rings(
                 elif neighbour not in path:
                     stack.append((neighbour, path + [neighbour]))
 
-    logger.info("  %d rings detected (checked %d/%d nodes before deadline)",
-                len(rings_found),
-                min(nodes_list.index(start) + 1 if rings_found else len(nodes_list),
-                    len(nodes_list)),
-                len(nodes_list))
+    logger.info("  %d rings detected (%d/%d nodes checked before deadline/cap)",
+                len(rings_found), nodes_checked, len(nodes_list))
     return ring_count, ring_volume, rings_found
 
 

@@ -60,9 +60,11 @@ MODEL_META  = SHARED_DATA / "model_meta.json"
 HIDDEN_CHANNELS = 128
 OUT_CHANNELS    = 2
 MAX_EPOCHS      = 1000   # hard ceiling; early stopping will fire well before this
-WARMUP_EPOCHS   = 200    # [F2] no early stopping before this epoch
-PATIENCE_EPOCHS = 80     # [F5] stop if AUC hasn't improved for this many epochs
-CHECK_INTERVAL  = 5      # evaluate every N epochs
+WARMUP_EPOCHS   = 150    # no early stopping before this epoch
+# Patience in NUMBER OF CHECKS (not epochs). With CHECK_INTERVAL=10 this is
+# 300 epochs of no improvement before we give up — survivable on CPU.
+PATIENCE_CHECKS = 30
+CHECK_INTERVAL  = 10     # evaluate every N epochs (less CPU hammering)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -261,16 +263,17 @@ def train() -> None:
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
 
-    # [F8] ReduceLROnPlateau: reduce LR by 0.5 if AUC stalls for 20 checks
+    # ReduceLROnPlateau: patience=40 checks = 400 epochs of stagnation before
+    # halving LR.  Previous value of 20 caused LR to collapse inside warmup.
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="max", factor=0.5, patience=20,
+        optimizer, mode="max", factor=0.5, patience=40,
         min_lr=1e-6, verbose=False,
     )
 
     # ── Training loop ─────────────────────────────────────────────────────────
-    best_val_auc     = 0.0   # [F1] track AUC, not F1
-    best_val_f1      = 0.0   # also track F1 for logging
-    epochs_no_improve = 0    # [F5] raw epoch counter, not strikes×interval
+    best_val_auc      = 0.0
+    best_val_f1       = 0.0
+    checks_no_improve = 0   # counts CHECK events with no improvement (not epochs)
     history: list[dict] = []
 
     header = (
@@ -312,11 +315,11 @@ def train() -> None:
             if epoch > 20:
                 scheduler.step(val_m["auc_roc"])
 
-            # [F1] Track best AUC; also save best F1 for reporting
+            # Track best AUC; save checkpoint
             if val_m["auc_roc"] > best_val_auc:
-                best_val_auc = val_m["auc_roc"]
-                best_val_f1  = val_m["f1"]
-                epochs_no_improve = 0
+                best_val_auc      = val_m["auc_roc"]
+                best_val_f1       = val_m["f1"]
+                checks_no_improve = 0          # reset on any improvement
                 torch.save(model.state_dict(), MODEL_PATH)
                 logger.info(
                     "  ✓ Best AUC=%.4f  F1=%.4f  (prec=%.4f rec=%.4f) — saved",
@@ -324,14 +327,16 @@ def train() -> None:
                     val_m["precision"], val_m["recall"],
                 )
             else:
-                # [F2] Only count towards patience AFTER warm-up period
+                # Only count towards patience AFTER warm-up period is done.
+                # Bug was: counter incremented during warmup so early stopping
+                # fired immediately after warmup ended.
                 if epoch > WARMUP_EPOCHS:
-                    epochs_no_improve += CHECK_INTERVAL
-                    if epochs_no_improve >= PATIENCE_EPOCHS:
+                    checks_no_improve += 1
+                    if checks_no_improve >= PATIENCE_CHECKS:
                         logger.info(
                             "  Early stopping at epoch %d  "
-                            "(no AUC improvement for %d epochs)",
-                            epoch, PATIENCE_EPOCHS,
+                            "(no AUC improvement for %d checks = %d epochs)",
+                            epoch, PATIENCE_CHECKS, PATIENCE_CHECKS * CHECK_INTERVAL,
                         )
                         break
 
@@ -383,7 +388,8 @@ def train() -> None:
             "optimizer":       "AdamW(lr=1e-3→ReduceLROnPlateau, wd=1e-4)",
             "class_counts":    {"safe": n_tr_neg, "fraud": n_tr_pos},
             "warmup_epochs":   WARMUP_EPOCHS,
-            "patience_epochs": PATIENCE_EPOCHS,
+            "patience_checks": PATIENCE_CHECKS,
+            "patience_epochs": PATIENCE_CHECKS * CHECK_INTERVAL,
         },
     }
     with open(EVAL_REPORT, "w") as f:

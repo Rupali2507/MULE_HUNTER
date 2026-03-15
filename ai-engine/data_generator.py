@@ -389,12 +389,13 @@ def build_edges(df: pd.DataFrame) -> pd.DataFrame:
     MAX_GROUP_SIZE = 20
     all_edges: list[dict] = []
 
-    def _cooccurrence(group_col: str, edge_type: str) -> None:
+    def _cooccurrence(group_col: str, edge_type: str, source_df=None) -> None:
         """Emit bidirectional edges between accounts sharing group_col value."""
-        col_series = df[group_col]
+        target = source_df if source_df is not None else df
+        col_series = target[group_col]
         # Drop nulls and empty strings
         valid_mask = col_series.notna() & (col_series.astype(str).str.strip() != "")
-        sub = df[valid_mask][["user_id", group_col, "TransactionAmt"]].copy()
+        sub = target[valid_mask][["user_id", group_col, "TransactionAmt"]].copy()
         sub[group_col] = sub[group_col].astype(str)
 
         # Per-group, per-account total flow
@@ -436,10 +437,8 @@ def build_edges(df: pd.DataFrame) -> pd.DataFrame:
                    "macintel", "linux", "other"}
         df_dev = df_dev[~df_dev["DeviceInfo"].str.lower().isin(generic)]
         if len(df_dev) > 0:
-            # Temporarily replace df so _cooccurrence uses the filtered version
-            orig, df = df, df_dev
-            _cooccurrence("DeviceInfo", "shared_device")
-            df = orig
+            # Pass df_dev explicitly — no closure df-swap needed
+            _cooccurrence("DeviceInfo", "shared_device", source_df=df_dev)
 
     if not all_edges:
         logger.warning(
