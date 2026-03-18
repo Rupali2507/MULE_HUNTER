@@ -8,7 +8,7 @@ import {
   Link2, Network, Boxes, ChevronRight, Waves,
 } from "lucide-react";
 
-const ML_URL = process.env.NEXT_PUBLIC_ML_URL ?? "http://localhost:8081";
+const ML_URL = "http://56.228.10.113:8001/"
 
 // ─── SIDEBAR ──────────────────────────────────────────────────────────────────
 const NAV = [
