@@ -1,5 +1,6 @@
 package com.mulehunter.backend.controller;
 
+import com.mulehunter.backend.DTO.MetricsResponse;
 import com.mulehunter.backend.service.ModelEvaluationService;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,13 +18,13 @@ public class AdminEvaluationController {
         this.evaluationService = evaluationService;
     }
 
-    @PostMapping("/evaluate-models")
-    public Mono<String> evaluateModels() {
-
+    @GetMapping("/evaluate-models")
+    public Mono<MetricsResponse> evaluateModels(
+            @RequestParam(defaultValue = "7") int days
+    ) {
         Instant end = Instant.now();
-        Instant start = end.minusSeconds(7 * 24 * 3600);
+        Instant start = end.minusSeconds(days * 24L * 3600);
 
-        return evaluationService.evaluateModels(start, end)
-                .thenReturn("Model evaluation completed");
+        return evaluationService.evaluateModels(start, end);
     }
 }
