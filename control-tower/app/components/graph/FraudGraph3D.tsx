@@ -123,12 +123,14 @@ export default function FraudGraph3D({
               volume: n.volume,
             })
           ),
-          links: data.links.map(
-            (l: { source: string | number; target: string | number }): GraphLink => ({
-              source: l.source,
-              target: l.target,
-            })
-          ),
+
+          links: data.links
+            .filter((l: any) => l.source && l.target)
+            .map((l: any) => ({
+              source: String(l.source),
+              target: String(l.target),
+            })),
+          
         });
       } catch (err) {
         console.error("Graph load failed", err);
