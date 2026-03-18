@@ -29,33 +29,22 @@ public class GraphController {
                 this.mongo = mongo;
         }
 
-        // GET FULL GRAPH (nodes + links)
-
         @GetMapping
         public Mono<GraphResponseDTO> getGraph() {
 
                 // ---------- NODES ----------
                 Mono<List<GraphNodeDTO>> nodesMono = mongo.findAll(Map.class, "nodes")
                                 .map(doc -> {
-
                                         Object nodeIdObj = doc.get("node_id");
-                                        if (nodeIdObj == null)
-                                                return null;
+                                        if (nodeIdObj == null) return null;
 
                                         String nodeId = nodeIdObj.toString();
-
                                         double anomalyScore = parseDouble(doc.get("anomaly_score"));
-
-                                        boolean isAnomalous = "1"
-                                                        .equals(doc.getOrDefault("is_anomalous", "0").toString());
-
+                                        boolean isAnomalous = "1".equals(
+                                                doc.getOrDefault("is_anomalous", "0").toString());
                                         long txVelocity = parseLong(doc.get("tx_velocity"));
 
-                                        return new GraphNodeDTO(
-                                                        nodeId,
-                                                        anomalyScore,
-                                                        isAnomalous,
-                                                        txVelocity);
+                                        return new GraphNodeDTO(nodeId, anomalyScore, isAnomalous, txVelocity);
                                 })
                                 .filter(n -> n != null)
                                 .collectList()
@@ -64,16 +53,12 @@ public class GraphController {
                 // ---------- LINKS ----------
                 Mono<List<GraphLinkDTO>> linksMono = mongo.findAll(Map.class, "graph_edges")
                                 .map(doc -> {
-
                                         Object srcObj = doc.get("source");
                                         Object tgtObj = doc.get("target");
-
-                                        if (srcObj == null || tgtObj == null)
-                                                return null;
+                                        if (srcObj == null || tgtObj == null) return null;
 
                                         String source = srcObj.toString();
                                         String target = tgtObj.toString();
-
                                         BigDecimal amount = parseBigDecimal(doc.get("amount"));
 
                                         return new GraphLinkDTO(source, target, amount);
@@ -87,8 +72,6 @@ public class GraphController {
                                 .onErrorReturn(new GraphResponseDTO(List.of(), List.of()));
         }
 
-        // GET SINGLE NODE DETAIL (SHAP / reasons)
-
         @GetMapping("/node/{nodeId}")
         public Mono<GraphNodeDetailDTO> getNodeDetail(@PathVariable String nodeId) {
 
@@ -99,19 +82,16 @@ public class GraphController {
 
                 return mongo.findOne(query, Map.class, "nodes")
                                 .map(doc -> {
-
                                         double anomalyScore = parseDouble(doc.get("anomaly_score"));
-
-                                        boolean isAnomalous = "1"
-                                                        .equals(doc.getOrDefault("is_anomalous", "0").toString());
+                                        boolean isAnomalous = "1".equals(
+                                                doc.getOrDefault("is_anomalous", "0").toString());
 
                                         @SuppressWarnings("unchecked")
                                         List<String> reasons = (List<String>) doc.getOrDefault("reasons", List.of());
 
                                         @SuppressWarnings("unchecked")
                                         List<Map<String, Object>> shapFactors = (List<Map<String, Object>>) doc
-                                                        .getOrDefault(
-                                                                        "shap_factors", List.of());
+                                                        .getOrDefault("shap_factors", List.of());
 
                                         return new GraphNodeDetailDTO(
                                                         doc.get("node_id").toString(),
@@ -120,48 +100,27 @@ public class GraphController {
                                                         reasons,
                                                         shapFactors);
                                 })
-
-                                .switchIfEmpty(
-                                                Mono.just(
-                                                                new GraphNodeDetailDTO(
-                                                                                nodeId,
-                                                                                0.0,
-                                                                                false,
-                                                                                List.of(),
-                                                                                List.of())));
+                                .switchIfEmpty(Mono.just(new GraphNodeDetailDTO(
+                                                nodeId, 0.0, false, List.of(), List.of())));
         }
 
-        // SAFE PARSERS
-
         private static double parseDouble(Object v) {
-                try {
-                        return v == null ? 0.0 : Double.parseDouble(v.toString());
-                } catch (Exception e) {
-                        return 0.0;
-                }
+                try { return v == null ? 0.0 : Double.parseDouble(v.toString()); }
+                catch (Exception e) { return 0.0; }
         }
 
         private static long parseLong(Object v) {
-                try {
-                        return v == null ? 0L : Long.parseLong(v.toString());
-                } catch (Exception e) {
-                        return 0L;
-                }
+                try { return v == null ? 0L : Long.parseLong(v.toString()); }
+                catch (Exception e) { return 0L; }
         }
 
         private static BigDecimal parseBigDecimal(Object v) {
-                try {
-                        return v == null ? BigDecimal.ZERO : new BigDecimal(v.toString());
-                } catch (Exception e) {
-                        return BigDecimal.ZERO;
-                }
+                try { return v == null ? BigDecimal.ZERO : new BigDecimal(v.toString()); }
+                catch (Exception e) { return BigDecimal.ZERO; }
         }
 
         private static Integer parseIntSafe(String v) {
-                try {
-                        return Integer.valueOf(v);
-                } catch (Exception e) {
-                        return null;
-                }
+                try { return Integer.valueOf(v); }
+                catch (Exception e) { return null; }
         }
 }
