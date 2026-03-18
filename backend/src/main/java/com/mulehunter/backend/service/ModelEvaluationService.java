@@ -2,11 +2,11 @@ package com.mulehunter.backend.service;
 
 import com.mulehunter.backend.DTO.MetricsResponse;
 import com.mulehunter.backend.model.ModelPerformanceMetrics;
+import com.mulehunter.backend.model.NodeEnriched;
 import com.mulehunter.backend.model.Transaction;
-import com.mulehunter.backend.model.Node;
 import com.mulehunter.backend.repository.ModelMetricsRepository;
 import com.mulehunter.backend.repository.TransactionRepository;
-import com.mulehunter.backend.repository.NodeRepository;
+import com.mulehunter.backend.repository.NodeEnrichedRepository;
 import com.mulehunter.backend.util.ConfusionMatrix;
 
 import org.springframework.stereotype.Service;
@@ -18,12 +18,12 @@ import java.time.Instant;
 public class ModelEvaluationService {
 
     private final TransactionRepository transactionRepo;
-    private final NodeRepository nodeRepo;
+    private final NodeEnrichedRepository nodeRepo;
     private final ModelMetricsRepository metricsRepo;
 
     public ModelEvaluationService(
             TransactionRepository transactionRepo,
-            NodeRepository nodeRepo,
+            NodeEnrichedRepository nodeRepo,
             ModelMetricsRepository metricsRepo
     ) {
         this.transactionRepo = transactionRepo;
@@ -33,26 +33,42 @@ public class ModelEvaluationService {
 
     public Mono<MetricsResponse> evaluateModels(Instant start, Instant end) {
 
+        double combinedThreshold = 0.45;
+        double gnnThreshold = 0.50;
+        double eifThreshold = 0.60;
+
         return transactionRepo.findByTimestampBetween(start, end)
 
-                // 🔥 JOIN with NODE LABELS (GROUND TRUTH)
-                .flatMap(tx ->
-                        nodeRepo.findByNodeId(tx.getSourceAccount())
-                                .zipWith(nodeRepo.findByNodeId(tx.getTargetAccount()))
-                                .map(tuple -> {
+                .flatMap(tx -> {
 
-                                    Node src = tuple.getT1();
-                                    Node tgt = tuple.getT2();
+                    Long srcId, tgtId;
+                    try {
+                        srcId = Long.parseLong(tx.getSourceAccount());
+                        tgtId = Long.parseLong(tx.getTargetAccount());
+                    } catch (Exception e) {
+                        return Mono.empty(); // skip invalid IDs safely
+                    }
 
-                                    // ✅ ACTUAL LABEL FROM NODE DATA
-                                    int actual = (
-                                            "1".equals(src.getIsFraud()) ||
-                                            "1".equals(tgt.getIsFraud())
-                                    ) ? 1 : 0;
+                    return nodeRepo.findByNodeId(srcId)
+                            .defaultIfEmpty(new NodeEnriched())
+                            .zipWith(
+                                nodeRepo.findByNodeId(tgtId)
+                                        .defaultIfEmpty(new NodeEnriched())
+                            )
+                            .map(tuple -> {
 
-                                    return new EvaluationRow(tx, actual);
-                                })
-                )
+                                NodeEnriched src = tuple.getT1();
+                                NodeEnriched tgt = tuple.getT2();
+
+                                // ⚠️ Replace with real label if available
+                                int actual = (
+                                        "1".equals(src.getIsFraud()) ||
+                                        "1".equals(tgt.getIsFraud())
+                                ) ? 1 : 0;
+
+                                return new EvaluationRow(tx, actual);
+                            });
+                })
 
                 .collectList()
 
@@ -66,28 +82,27 @@ public class ModelEvaluationService {
 
                         int actual = r.actual;
 
-                        // 🔥 PREDICTIONS
                         int combinedPred = (r.tx.getRiskScore() != null &&
-                                r.tx.getRiskScore() >= 0.45) ? 1 : 0;
+                                r.tx.getRiskScore() >= combinedThreshold) ? 1 : 0;
 
                         int gnnPred = (r.tx.getGnnScore() != null &&
-                                r.tx.getGnnScore() >= 0.45) ? 1 : 0;
+                                r.tx.getGnnScore() >= gnnThreshold) ? 1 : 0;
 
                         int eifPred = (r.tx.getUnsupervisedScore() != null &&
-                                r.tx.getUnsupervisedScore() >= 0.45) ? 1 : 0;
+                                r.tx.getUnsupervisedScore() >= eifThreshold) ? 1 : 0;
 
                         combinedCM.add(combinedPred, actual);
                         gnnCM.add(gnnPred, actual);
                         eifCM.add(eifPred, actual);
                     }
 
-                    // ── BUILD RESPONSE ─────────────────────
                     MetricsResponse response = new MetricsResponse();
                     response.combined = buildMetrics(combinedCM);
                     response.gnn = buildMetrics(gnnCM);
                     response.eif = buildMetrics(eifCM);
+                  
 
-                    // ── STORE COMBINED METRICS ─────────────
+                    // Save combined model performance
                     ModelPerformanceMetrics metrics = new ModelPerformanceMetrics();
                     metrics.setModelName("MuleHunter");
                     metrics.setModelVersion("v1");
@@ -98,6 +113,9 @@ public class ModelEvaluationService {
                     metrics.setRecall(response.combined.recall);
                     metrics.setF1Score(response.combined.f1Score);
                     metrics.setAccuracy(response.combined.accuracy);
+
+                    metrics.setFpr(response.combined.fpr);
+                    metrics.setFnr(response.combined.fnr);
 
                     metrics.setTp((int) combinedCM.getTp());
                     metrics.setFp((int) combinedCM.getFp());
@@ -129,6 +147,10 @@ public class ModelEvaluationService {
                 2 * m.precision * m.recall / (m.precision + m.recall);
         m.accuracy = (tp + tn + fp + fn == 0) ? 0 :
                 (double) (tp + tn) / (tp + tn + fp + fn);
+
+        // 🔥 Additional fraud-critical metrics
+        m.fpr = (fp + tn == 0) ? 0 : (double) fp / (fp + tn);
+        m.fnr = (fn + tp == 0) ? 0 : (double) fn / (fn + tp);
 
         return m;
     }
