@@ -11,5 +11,7 @@ public class MetricsResponse {
         public double recall;
         public double f1Score;
         public double accuracy;
+         public double fpr;
+    public double fnr;
     }
 }

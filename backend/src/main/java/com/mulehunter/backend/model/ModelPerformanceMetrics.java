@@ -27,6 +27,10 @@ public class ModelPerformanceMetrics {
     private int tn;
     private int fn;
 
+    private double fpr;
+    private double fnr;
+
+
     private Instant evaluatedAt;
 
     // ── Constructors ─────────────────────────────────────────────
@@ -53,6 +57,22 @@ public class ModelPerformanceMetrics {
     }
 
     // ── Getters / Setters ───────────────────────────────────────
+
+     public double getFpr() {
+        return fpr;
+    }
+
+    public void setFpr(double fpr) {
+        this.fpr = fpr;
+    }
+
+    public double getFnr() {
+        return fnr;
+    }
+
+    public void setFnr(double fnr) {
+        this.fnr = fnr;
+    }
 
     public String getId() {
         return id;
