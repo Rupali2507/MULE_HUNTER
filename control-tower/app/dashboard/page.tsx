@@ -8,7 +8,9 @@ import {
   Link2, Network, Boxes, ChevronRight, Waves,
 } from "lucide-react";
 
-const ML_URL = "http://56.228.10.113:8001"
+// ─── BASE URLS ────────────────────────────────────────────────────────────────
+const ML_URL  = "http://56.228.10.113:8001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8082";
 
 // ─── SIDEBAR ──────────────────────────────────────────────────────────────────
 const NAV = [
@@ -239,8 +241,11 @@ function PageHeading({ eyebrow, title, accent, description }: { eyebrow: string;
   );
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// SIMULATOR — ✅ CONNECTED: POST /api/transactions (Spring Boot)
+// ═════════════════════════════════════════════════════════════════════════════
 function SimulatorSection() {
-  const [form, setForm] = useState({ sid: "", did: "", amt: "", ccy: "INR", ip: "49.204.11.92", ja3: "771,4866-4867-4865,...", dev: "device_8s7df6", nb: "4", hd: "0.47" });
+  const [form, setForm] = useState({ sid: "ACC1553", did: "ACC899", amt: "2077", ccy: "INR", ip: "49.204.11.92", ja3: "771,4866-4867-4865,...", dev: "device_8s7df6", nb: "4", hd: "0.47" });
   const [step, setStep] = useState(0);
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -250,61 +255,29 @@ function SimulatorSection() {
     setResult(null); setLoading(true); setStep(0);
     const dl = [80, 80, 80, 80, 80, 80, 80, 220, 80, 80, 80, 80, 300, 120];
     for (let i = 0; i < 14; i++) { setStep(i + 1); await new Promise(r => setTimeout(r, dl[i])); }
-
-    const payload = {
-      transactionId: "TXN-" + Date.now(),
-      sourceAccount: form.sid,
-      targetAccount: form.did,
-      amount: Number(form.amt),
-      timestamp: new Date().toISOString(),
-    }
-
-
     try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/transactions`, {
+      const res = await fetch(`${API_URL}/api/transactions`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-JA3-Fingerprint": form.ja3,
-        },
-        body: JSON.stringify(payload),
+        headers: { "Content-Type": "application/json", "X-JA3-Fingerprint": form.ja3 },
+        body: JSON.stringify({ transactionId: crypto.randomUUID(), sourceAccount: form.sid, targetAccount: form.did, amount: Number(form.amt) }),
       });
-
-      const text = await res.text();
-      console.log("RAW RESPONSE:", text);
-
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        throw new Error("Invalid JSON from backend");
-      }
+      const data = await res.json();
       setResult({
         gnnScore:      data.modelScores?.gnn        ?? 0,
         eifScore:      data.modelScores?.eif        ?? 0,
         eifConf:       data.modelScores?.confidence ?? 0,
         fusionScore:   data.riskScore               ?? 0,
         decision:      data.decision                ?? "REVIEW",
-        latency_ms: 40, 
         clusterId:     data.fraudCluster?.clusterId ?? 0,
         embeddingNorm: data.embeddingNorm           ?? 0,
-        shapValues: Object.fromEntries(
-        Object.entries(data.modelScores?.eifTopFactors || {}).map(([k, v]) => [
-          k,
-          Number(v) || 0,
-        ] )
-        ),
-        identityFeatures: data.ja3Security ?? {},
+        shapValues:    data.modelScores?.eifTopFactors ?? {},
         networkMetrics: data.networkMetrics ?? { suspiciousNeighbors: 0, centralityScore: 0, transactionLoops: false, sharedDevices: 0 },
         muleRing:    data.muleRingDetection ?? { isMuleRingMember: false },
         riskFactors: data.riskFactors       ?? [],
         modelBreakdown: { gnn: data.modelScores?.gnn ?? 0, eif: data.modelScores?.eif ?? 0, identity: data.modelScores?.behavior ?? 0 },
         ja3: { isNewDevice: data.ja3Security?.isNewDevice ?? false, isNewJa3: data.ja3Security?.isNewJa3 ?? false, reuse: data.ja3Security?.velocity ?? 0 },
       });
-    } catch (err) {
-    console.error(err);
-    alert("Backend not reachable");
-  }
+    } catch { alert("Spring Boot not reachable at " + API_URL); }
     setStep(15); setLoading(false);
   };
 

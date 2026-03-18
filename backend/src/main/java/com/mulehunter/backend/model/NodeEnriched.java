@@ -25,9 +25,14 @@ public class NodeEnriched {
     private long accountAgeDays;
     private double balance;
 
+    // ✅ ADD THIS (CRITICAL)
+    private String isFraud; // "1" or "0"
+
     private Instant updatedAt;
 
     public NodeEnriched() {}
+
+    // ─── Getters & Setters ─────────────────
 
     public String getId() {
         return id;
@@ -107,6 +112,15 @@ public class NodeEnriched {
 
     public void setBalance(double balance) {
         this.balance = balance;
+    }
+
+    // ✅ NEW GETTER/SETTER
+    public String getIsFraud() {
+        return isFraud;
+    }
+
+    public void setIsFraud(String isFraud) {
+        this.isFraud = isFraud;
     }
 
     public Instant getUpdatedAt() {
