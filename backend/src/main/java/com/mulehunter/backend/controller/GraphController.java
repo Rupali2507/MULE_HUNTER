@@ -3,6 +3,8 @@ package com.mulehunter.backend.controller;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -63,24 +65,43 @@ public class GraphController {
 
                 // ---------- LINKS ----------
                 Mono<List<GraphLinkDTO>> linksMono = mongo.findAll(Map.class, "transactions")
-                                .map(doc -> {
+                .collectList()
+                .zipWith(nodesMono)
+                .map(tuple -> {
 
-                                        Object srcObj = doc.get("source");
-                                        Object tgtObj = doc.get("target");
+                        List<Map> txs = tuple.getT1();
+                        List<GraphNodeDTO> nodes = tuple.getT2();
 
-                                        if (srcObj == null || tgtObj == null)
-                                                return null;
+                        // ✅ correct for record
+                        Set<String> nodeIds = nodes.stream()
+                        .map(GraphNodeDTO::nodeId)
+                        .collect(Collectors.toSet());
 
-                                        String source = srcObj.toString();
-                                        String target = tgtObj.toString();
+                        return txs.stream()
+                        .map(doc -> {
+                                Object srcObj = doc.get("source");
+                                Object tgtObj = doc.get("target");
 
-                                        BigDecimal amount = parseBigDecimal(doc.get("amount"));
+                                if (srcObj == null || tgtObj == null) return null;
 
-                                        return new GraphLinkDTO(source, target, amount);
-                                })
-                                .filter(l -> l != null)
-                                .collectList()
-                                .onErrorReturn(List.of());
+                                String source = srcObj.toString();
+                                String target = tgtObj.toString();
+
+                                // ✅ THIS IS THE KEY LINE (fixes crash)
+                                if (!nodeIds.contains(source) || !nodeIds.contains(target)) {
+                                return null;
+                                }
+
+                                return new GraphLinkDTO(
+                                source,
+                                target,
+                                parseBigDecimal(doc.get("amount"))
+                                );
+                        })
+                        .filter(l -> l != null)
+                        .toList();
+                });
+                
 
                 return Mono.zip(nodesMono, linksMono)
                                 .map(t -> new GraphResponseDTO(t.getT1(), t.getT2()))

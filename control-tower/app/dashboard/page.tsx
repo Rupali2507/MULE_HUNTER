@@ -397,7 +397,7 @@ function SimulatorSection() {
                   </div>
                   <div className="space-y-5">
                     <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/20">SHAP Importance</p>
-                    {Object.entries(result.shapValues).map(([k,v])=><Bar key={k} label={k} value={v} max={0.3} color="#a855f7"/>)}
+                    {Object.entries(result.shapValues ?? {}).map(([k,v]) => <Bar key={k} label={k} value={Number(v)} max={0.3} color="#a855f7" />)}
                   </div>
                 </div>
               )}
