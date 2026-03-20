@@ -15,13 +15,6 @@
 
 ---
 
-<img src="https://img.shields.io/badge/AUC--ROC-0.9906-00ff88?style=for-the-badge&labelColor=0a0a0a" />
-<img src="https://img.shields.io/badge/F1%20Score-0.8604-00ff88?style=for-the-badge&labelColor=0a0a0a" />
-<img src="https://img.shields.io/badge/Inference-%3C50ms-00ff88?style=for-the-badge&labelColor=0a0a0a" />
-<img src="https://img.shields.io/badge/Rings%20Detected-300-ff4444?style=for-the-badge&labelColor=0a0a0a" />
-<img src="https://img.shields.io/badge/Transactions-590%2C540-facc15?style=for-the-badge&labelColor=0a0a0a" />
-
-<br /><br />
 
 ```
 ╔══════════════════════════════════════════════════════════════════════╗
