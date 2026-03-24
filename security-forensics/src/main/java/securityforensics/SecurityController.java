@@ -175,6 +175,39 @@ public class SecurityController {
         return response;
     }
 
+    // ── ENDPOINT: Verify blockchain integrity ──────────────────────────
+    @GetMapping("/blockchain/verify")
+    public Map<String, Object> verifyChain() {
+        boolean valid = true;
+        String reason = "Chain is intact";
+
+        for (int i = 1; i < blockchain.chain.size(); i++) {
+            Block current  = blockchain.chain.get(i);
+            Block previous = blockchain.chain.get(i - 1);
+
+            // Check block's own hash
+            if (!current.isValid()) {
+                valid  = false;
+                reason = "Block #" + i + " hash is invalid (tampered!)";
+                break;
+            }
+
+            // Check chain linkage
+            if (!current.previousHash.equals(previous.hash)) {
+                valid  = false;
+                reason = "Block #" + i + " broken link (chain tampered!)";
+                break;
+            }
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("valid",       valid);
+        response.put("reason",      reason);
+        response.put("totalBlocks", blockchain.chain.size());
+        response.put("totalLogs",   blockchain.chain.stream().mapToInt(b -> b.logs.size()).sum());
+        return response;
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // ENDPOINT 5: FORCE BLOCK (demo use)
     // ─────────────────────────────────────────────────────────────────────────
@@ -192,6 +225,8 @@ public class SecurityController {
         response.put("logsInBlock", latest.logs.size());
         return response;
     }
+
+    
 
     // ─────────────────────────────────────────────────────────────────────────
     // UTIL
