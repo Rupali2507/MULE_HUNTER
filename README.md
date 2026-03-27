@@ -17,8 +17,8 @@
 
 Use the following credentials to access the admin panel after logging in:
 
-- **Email:** admin@test.com  
-- **Password:** Test@123
+**Email:** admin@test.com  
+**Password:** Test@123
 
 > ⚠️ **Note:** These credentials are provided for testing purposes during the hackathon
 ---
