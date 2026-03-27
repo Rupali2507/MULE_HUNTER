@@ -5,7 +5,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import {
   Zap, RefreshCw, BarChart3, Fingerprint, Shuffle,
-  Link2, Network, Boxes, ChevronRight, Waves,
+  Link2, Network, Boxes, ChevronRight, Waves, Menu, X,
 } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 
@@ -127,10 +127,10 @@ function Gauge({ score, label }: { score: number; label: string }) {
 }
 function StatCard({ label, value, sub, color = "text-[#CAFF33]", accent }: { label: string; value: React.ReactNode; sub: string; color?: string; accent?: string }) {
   return (
-    <Card className="p-6 relative overflow-hidden">
+    <Card className="p-4 sm:p-6 relative overflow-hidden">
       {accent && <div className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-[0.03]" style={{ background: accent, filter: "blur(24px)", transform: "translate(30%,-30%)" }} />}
-      <p className="text-[10px] text-white/70 uppercase tracking-[0.2em] mb-3 font-bold">{label}</p>
-      <p className={`text-4xl font-black leading-none mb-2 ${color}`}>{value}</p>
+      <p className="text-[10px] text-white/70 uppercase tracking-[0.2em] mb-2 sm:mb-3 font-bold">{label}</p>
+      <p className={`text-2xl sm:text-4xl font-black leading-none mb-1 sm:mb-2 ${color}`}>{value}</p>
       <p className="text-xs text-white/60">{sub}</p>
     </Card>
   );
@@ -242,9 +242,9 @@ function Field({ label, k, form, setForm }: { label: string; k: string; form: Re
 }
 function PageHeading({ eyebrow, title, accent, description }: { eyebrow: string; title: string; accent: string; description: string }) {
   return (
-    <div className="mb-10">
+    <div className="mb-6 sm:mb-10">
       <Eyebrow>{eyebrow}</Eyebrow>
-      <h2 className="text-[2.6rem] font-black tracking-tight leading-none mb-3">
+      <h2 className="text-2xl sm:text-[2.6rem] font-black tracking-tight leading-none mb-2 sm:mb-3">
         {title} <span className="text-[#CAFF33]">{accent}</span>
       </h2>
       <p className="text-sm text-white/75 max-w-lg leading-relaxed">{description}</p>
@@ -278,12 +278,14 @@ function SimulatorSection() {
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [tab,     setTab]     = useState("Overview");
+  const [showPipeline, setShowPipeline] = useState(false);
 
   const run = async () => {
     setResult(null);
     setApiError(null);
     setLoading(true);
     setStep(0);
+    setShowPipeline(true);
 
     const dl = [80,80,80,80,80,80,80,220,80,80,80,80,300,120];
     for (let i = 0; i < 14; i++) { setStep(i + 1); await new Promise(r => setTimeout(r, dl[i])); }
@@ -373,13 +375,14 @@ function SimulatorSection() {
   ] : [];
 
   return (
-    <div className="grid grid-cols-[270px_1fr_210px] gap-5 h-full">
-      <Card className="flex flex-col overflow-y-auto">
-        <div className="p-6 border-b border-white/[0.05]">
+    <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[270px_1fr_210px] lg:gap-5 lg:h-full">
+      {/* Input Card */}
+      <Card className="flex flex-col">
+        <div className="p-5 sm:p-6 border-b border-white/[0.12]">
           <Eyebrow>Input</Eyebrow>
           <p className="text-lg font-bold text-white">Transaction</p>
         </div>
-        <div className="p-6 space-y-5 flex-1">
+        <div className="p-5 sm:p-6 space-y-5 flex-1">
           <div className="space-y-3">
             <div className="px-3 py-2 rounded-lg bg-[#CAFF33]/[0.04] border border-[#CAFF33]/10">
               <p className="text-[9px] text-[#CAFF33]/70 leading-relaxed">
@@ -405,7 +408,7 @@ function SimulatorSection() {
             <Field label="2-Hop Fraud Density"   k="hd" form={form} setForm={setForm} />
           </div>
         </div>
-        <div className="p-5 border-t border-white/[0.04]">
+        <div className="p-4 sm:p-5 border-t border-white/[0.04]">
           <button onClick={run} disabled={loading}
             className="w-full py-3.5 bg-[#CAFF33] hover:bg-[#d4ff55] active:scale-[0.99] disabled:opacity-40 text-black font-bold rounded-xl text-[11px] uppercase tracking-[0.15em] transition-all">
             {loading ? "Processing…" : "Score Transaction"}
@@ -413,16 +416,17 @@ function SimulatorSection() {
         </div>
       </Card>
 
-      <div className="flex flex-col gap-4 overflow-y-auto min-w-0">
+      {/* Results */}
+      <div className="flex flex-col gap-4 min-w-0">
         {apiError && <ErrorBanner message={apiError} />}
 
         {result ? (
           <>
-            <Card className={`p-8 border ${bg(result.riskScore)}`}>
-              <div className="flex items-start justify-between">
+            <Card className={`p-5 sm:p-8 border ${bg(result.riskScore)}`}>
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div>
                   <Eyebrow>Risk Verdict</Eyebrow>
-                  <p className={`text-[3.25rem] font-black uppercase tracking-tight leading-none ${tc(result.riskScore)}`}
+                  <p className={`text-4xl sm:text-[3.25rem] font-black uppercase tracking-tight leading-none ${tc(result.riskScore)}`}
                     style={{ textShadow: `0 0 60px ${hex(result.riskScore)}33` }}>
                     {result.decision}
                   </p>
@@ -431,7 +435,7 @@ function SimulatorSection() {
                     {result.suspectedFraud && <span className="ml-3 text-red-400">● Suspected fraud</span>}
                   </p>
                 </div>
-                <div className="flex gap-10 items-end">
+                <div className="flex flex-wrap gap-4 sm:gap-10 items-end">
                   {([
                     ["Fusion",    result.riskScore],
                     ["GNN",       result.gnnScore],
@@ -440,39 +444,39 @@ function SimulatorSection() {
                   ] as [string, number][]).map(([l, v]) => (
                     <div key={l} className="text-right">
                       <p className="text-[9px] text-white/65 uppercase tracking-widest mb-1">{l}</p>
-                      <p className={`text-2xl font-black font-mono ${tc(v)}`}>{f4(v, 3)}</p>
+                      <p className={`text-xl sm:text-2xl font-black font-mono ${tc(v)}`}>{f4(v, 3)}</p>
                     </div>
                   ))}
                 </div>
               </div>
             </Card>
 
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {([
                 ["GNN",      result.gnnScore,      `Cluster #${result.clusterId} · emb ${f4(result.embeddingNorm, 2)}`],
                 ["EIF",      result.eifScore,       `Conf ${f4(result.eifConf, 3)}`],
                 ["Behavior", result.behaviorScore,  "velocity + burst + deviation"],
                 ["Fusion",   result.riskScore,      "0.40·GNN+0.20·EIF+0.25·B+0.10·G+0.05·J"],
               ] as [string, number, string][]).map(([l, v, s]) => (
-                <Card key={l} className="p-6 flex flex-col items-center gap-2">
+                <Card key={l} className="p-4 sm:p-6 flex flex-col items-center gap-2">
                   <Gauge score={v} label={l} />
                   <p className="text-[9px] text-white/65 text-center leading-relaxed">{s}</p>
                 </Card>
               ))}
             </div>
 
-            <Card className="p-6 flex-1">
+            <Card className="p-4 sm:p-6 flex-1">
               <div className="flex gap-1.5 mb-6 pb-5 border-b border-white/[0.05] flex-wrap">
                 {["Overview","Behavioral","Structural","Identity","Fusion"].map(t => (
                   <button key={t} onClick={() => setTab(t)}
-                    className={`px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all ${tab === t ? "bg-[#CAFF33] text-black" : "text-white/75 hover:text-white"}`}>
+                    className={`px-3 sm:px-4 py-2 rounded-full text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-all ${tab === t ? "bg-[#CAFF33] text-black" : "text-white/75 hover:text-white"}`}>
                     {t}
                   </button>
                 ))}
               </div>
 
               {tab === "Overview" && (
-                <div className="grid grid-cols-2 gap-10">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-10">
                   <div className="space-y-5">
                     <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/70">Score Breakdown</p>
                     <Bar label="GNN — structural graph signal"  value={result.gnnScore}      color={hex(result.gnnScore)} />
@@ -503,10 +507,10 @@ function SimulatorSection() {
               )}
 
               {tab === "Behavioral" && (
-                <div className="grid grid-cols-2 gap-10">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-10">
                   <div>
                     <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/70 mb-3">EIF Score</p>
-                    <p className={`text-6xl font-black font-mono mb-3 leading-none ${tc(result.eifScore)}`}>{f4(result.eifScore, 4)}</p>
+                    <p className={`text-5xl sm:text-6xl font-black font-mono mb-3 leading-none ${tc(result.eifScore)}`}>{f4(result.eifScore, 4)}</p>
                     <p className="text-sm text-white/70 mb-1">
                       EIF Confidence: <span className="text-white/80">{f4(result.eifConf, 4)}</span>
                     </p>
@@ -534,10 +538,10 @@ function SimulatorSection() {
               )}
 
               {tab === "Structural" && (
-                <div className="grid grid-cols-2 gap-10">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-10">
                   <div>
                     <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/70 mb-3">GNN Score</p>
-                    <p className={`text-6xl font-black font-mono mb-6 leading-none ${tc(result.gnnScore)}`}>{f4(result.gnnScore, 4)}</p>
+                    <p className={`text-5xl sm:text-6xl font-black font-mono mb-6 leading-none ${tc(result.gnnScore)}`}>{f4(result.gnnScore, 4)}</p>
                     <div>
                       {([
                         ["Fraud Cluster",    `#${result.clusterId}`],
@@ -553,7 +557,7 @@ function SimulatorSection() {
                   </div>
                   <div>
                     <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/70 mb-4">Ring Membership</p>
-                    <div className={`p-6 rounded-2xl border ${result.muleRing.isMuleRingMember ? "bg-red-500/[0.03] border-red-500/15" : "bg-[#CAFF33]/[0.03] border-[#CAFF33]/15"}`}>
+                    <div className={`p-5 sm:p-6 rounded-2xl border ${result.muleRing.isMuleRingMember ? "bg-red-500/[0.03] border-red-500/15" : "bg-[#CAFF33]/[0.03] border-[#CAFF33]/15"}`}>
                       <p className={`text-2xl font-black mb-5 ${result.muleRing.isMuleRingMember ? "text-red-400" : "text-[#CAFF33]"}`}>
                         {result.muleRing.isMuleRingMember ? "RING MEMBER" : "NOT IN RING"}
                       </p>
@@ -584,7 +588,7 @@ function SimulatorSection() {
 
               {tab === "Identity" && (
                 <div className="space-y-5">
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {[
                       { l: "JA3 Velocity",  v: result.ja3.reuse,   w: 5 },
                       { l: "JA3 Risk",      v: result.ja3.ja3Risk, w: 0.5, fmt: (x: number) => f4(x, 3) },
@@ -599,7 +603,7 @@ function SimulatorSection() {
                       </Card>
                     ))}
                   </div>
-                  <div className="flex gap-8 p-5 rounded-xl border border-white/[0.05]">
+                  <div className="flex flex-wrap gap-4 sm:gap-8 p-5 rounded-xl border border-white/[0.05]">
                     {([["New Device", result.ja3.isNewDevice], ["New JA3", result.ja3.isNewJa3]] as [string, boolean][]).map(([l, v]) => (
                       <div key={l} className="flex gap-3 items-center">
                         <span className="text-xs text-white/75">{l}</span>
@@ -612,7 +616,7 @@ function SimulatorSection() {
               )}
 
               {tab === "Fusion" && (
-                <div className="grid grid-cols-2 gap-10">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-10">
                   <div>
                     <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/70 mb-4">Formula (Spring Boot · combineRiskSignals)</p>
                     <div className="p-5 rounded-2xl bg-black/50 border border-white/[0.05] font-mono space-y-2.5">
@@ -652,7 +656,7 @@ function SimulatorSection() {
           </>
         ) : (
           !apiError && (
-            <Card className="flex flex-col items-center justify-center flex-1 gap-5 min-h-[460px]">
+            <Card className="flex flex-col items-center justify-center flex-1 gap-5 min-h-[300px] sm:min-h-[460px]">
               <div className="relative flex items-center justify-center">
                 <div className="absolute w-32 h-32 rounded-full border border-white/[0.04]" />
                 <div className="absolute w-20 h-20 rounded-full border border-white/[0.05]" />
@@ -670,25 +674,36 @@ function SimulatorSection() {
         )}
       </div>
 
-      <Card className="flex flex-col overflow-y-auto">
-        <div className="p-5 border-b border-white/[0.04]">
-          <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/65">Pipeline</p>
-        </div>
-        <div className="p-3 flex flex-col gap-0.5 flex-1">
-          {PIPE.map((label, i) => (
-            <PipeStep key={i} n={i + 1} label={label}
-              active={step === i + 1} done={step > i + 1}
-              tag={i === 7 ? "∥" : i === 13 ? "async" : undefined} />
-          ))}
-        </div>
-        {step === 15 && (
-          <div className={`m-3 p-3.5 rounded-xl border ${apiError ? "bg-red-500/[0.07] border-red-500/15" : "bg-[#CAFF33]/[0.07] border-[#CAFF33]/15"}`}>
-            <p className={`text-[11px] font-bold ${apiError ? "text-red-400" : "text-[#CAFF33]"}`}>
-              {apiError ? "✗ Pipeline error — see details" : "✓ All 14 steps complete"}
-            </p>
+      {/* Pipeline — collapsible on mobile, always visible on lg */}
+      <div className="lg:block">
+        {/* Mobile toggle */}
+        <button
+          onClick={() => setShowPipeline(p => !p)}
+          className="lg:hidden w-full flex items-center justify-between px-4 py-3 rounded-2xl border border-white/[0.09] bg-[#0a0a0a] mb-2"
+        >
+          <span className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/65">Pipeline</span>
+          <ChevronRight className={`w-4 h-4 text-white/65 transition-transform ${showPipeline ? "rotate-90" : ""}`} />
+        </button>
+        <Card className={`flex-col overflow-y-auto ${showPipeline ? "flex" : "hidden lg:flex"}`}>
+          <div className="p-5 border-b border-white/[0.04] hidden lg:block">
+            <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/65">Pipeline</p>
           </div>
-        )}
-      </Card>
+          <div className="p-3 flex flex-col gap-0.5 flex-1">
+            {PIPE.map((label, i) => (
+              <PipeStep key={i} n={i + 1} label={label}
+                active={step === i + 1} done={step > i + 1}
+                tag={i === 7 ? "∥" : i === 13 ? "async" : undefined} />
+            ))}
+          </div>
+          {step === 15 && (
+            <div className={`m-3 p-3.5 rounded-xl border ${apiError ? "bg-red-500/[0.07] border-red-500/15" : "bg-[#CAFF33]/[0.07] border-[#CAFF33]/15"}`}>
+              <p className={`text-[11px] font-bold ${apiError ? "text-red-400" : "text-[#CAFF33]"}`}>
+                {apiError ? "✗ Pipeline error — see details" : "✓ All 14 steps complete"}
+              </p>
+            </div>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }
@@ -712,32 +727,32 @@ function GnnSection() {
       <PageHeading eyebrow="Graph Neural Network" title="Structural" accent="Analysis"
         description="SAGE → GAT(4 heads) → SAGE with residual skip connection. Trained on 590,540 IEEE-CIS transactions. Learns from both node features and graph topology." />
 
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
         {[
           { l: "Layer 1", t: "SAGEConv",    d: "Broad neighbourhood aggregation",              c: "text-blue-400",   b: "border-blue-400/[0.08]"  },
           { l: "Layer 2", t: "GATConv ×4",  d: "Attention-weighted neighbour selection",       c: "text-[#CAFF33]",  b: "border-[#CAFF33]/[0.08]" },
           { l: "Layer 3", t: "SAGEConv",    d: "Final aggregation + residual skip",            c: "text-yellow-400", b: "border-yellow-400/[0.08]" },
           { l: "Head",    t: "MLP 3-Layer", d: "BatchNorm + Dropout(0.15/0.05) + log_softmax", c: "text-red-400",    b: "border-red-400/[0.08]"   },
         ].map(x => (
-          <Card key={x.l} className={`p-6 border ${x.b}`}>
+          <Card key={x.l} className={`p-4 sm:p-6 border ${x.b}`}>
             <p className="text-[10px] text-white/65 uppercase tracking-widest mb-2">{x.l}</p>
-            <p className={`text-lg font-black mb-2.5 ${x.c}`}>{x.t}</p>
-            <p className="text-xs text-white/70 leading-relaxed">{x.d}</p>
+            <p className={`text-base sm:text-lg font-black mb-2 ${x.c}`}>{x.t}</p>
+            <p className="text-xs text-white/70 leading-relaxed hidden sm:block">{x.d}</p>
           </Card>
         ))}
       </div>
 
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <StatCard label="Total Nodes" value={stats ? stats.total_nodes.toLocaleString() : "—"} sub="Accounts in graph" />
         <StatCard label="Total Edges" value={stats ? stats.total_edges.toLocaleString() : "—"} sub="Transaction links" />
         <StatCard label="Fraud Nodes" value={stats ? stats.fraud_nodes.toLocaleString() : "—"} sub="Known fraud accounts" color="text-red-400" />
         <StatCard label="Fraud Rate"  value={stats ? `${(stats.fraud_rate * 100).toFixed(2)}%` : "—"} sub="Graph-wide prevalence" color="text-yellow-400" />
       </div>
 
-      <div className="grid grid-cols-[1.1fr_0.9fr] gap-5">
-        <Card className="p-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-5">
+        <Card className="p-5 sm:p-6">
           <p className="text-[10px] font-black uppercase tracking-[0.25em] text-white/65 mb-5">21 Feature Columns (FEATURE_COLS)</p>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {[
               ["account_age_days",     "tenure"],
               ["balance_mean",         "avg amount"],
@@ -763,7 +778,7 @@ function GnnSection() {
             ].map(([f, d]) => (
               <div key={f} className="p-3 rounded-xl border border-white/[0.04] bg-white/[0.01] hover:border-[#CAFF33]/15 transition-colors group cursor-default">
                 <p className="text-[9px] font-bold text-[#CAFF33]/70 leading-tight mb-0.5 group-hover:text-[#CAFF33]/90 transition-colors">{f}</p>
-                <p className="text-[8px] text-white/65">{d}</p>
+                <p className="text-[8px] text-white/65 hidden sm:block">{d}</p>
               </div>
             ))}
           </div>
@@ -775,10 +790,10 @@ function GnnSection() {
               <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/65">Live Network Graph</p>
               <LiveBadge loading={loading} error={error} />
             </div>
-            <div className="h-[240px] rounded-2xl overflow-hidden">
+            <div className="h-[200px] sm:h-[240px] rounded-2xl overflow-hidden">
               <Canvas liveNodes={snapshot?.nodes} />
             </div>
-            <div className="flex gap-5 mt-4 flex-wrap">
+            <div className="flex flex-wrap gap-3 sm:gap-5 mt-4">
               {[["#ef4444","Fraud"],["#f97316","Ring member"],["#facc15","High-risk"],["#CAFF33","Safe"]].map(([c, l]) => (
                 <div key={l} className="flex gap-2 items-center">
                   <div className="w-2 h-2 rounded-full" style={{ background: c, boxShadow: `0 0 6px ${c}` }} />
@@ -857,39 +872,39 @@ function EifSection() {
       <PageHeading eyebrow="Extended Isolation Forest" title="Behavioral" accent="Detection"
         description="Runs in parallel with GNN (Step 8). Detects anomalous behavior invisible to graph structure. 6 raw features → 12 expanded → path-length anomaly score." />
 
-      <div className="flex items-center gap-4 mb-6 p-4 rounded-2xl border border-white/[0.07] bg-white/[0.02]">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mb-6 p-4 rounded-2xl border border-white/[0.07] bg-white/[0.02]">
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${health?.model_loaded ? "bg-[#CAFF33]" : "bg-red-400"}`}
             style={health?.model_loaded ? { boxShadow: "0 0 8px #CAFF33" } : {}} />
           <span className="text-xs font-bold text-white/80">{health?.model_loaded ? "EIF Service Online" : "EIF Service Offline"}</span>
         </div>
-        <span className="text-white/20">|</span>
+        <span className="hidden sm:block text-white/20">|</span>
         {hasLive ? (
-          <>
+          <div className="flex flex-wrap gap-2 sm:gap-4 items-center">
             <span className="text-xs text-white/70">Last score:</span>
             <span className="text-sm font-black font-mono" style={{ color: hex(eifScore ?? 0) }}>{f4(eifScore ?? 0, 4)}</span>
             <span className="text-xs text-white/65">confidence: <span className="text-white/85 font-bold">{f4(eifConf ?? 0, 4)}</span></span>
-          </>
+          </div>
         ) : (
           <span className="text-xs text-white/55 italic">Score a transaction in Simulator to see live EIF output here.</span>
         )}
         <button onClick={runSanityTest} disabled={testing}
-          className="ml-auto px-4 py-1.5 rounded-lg border border-[#a855f7]/30 bg-[#a855f7]/[0.08] text-[#a855f7] text-[10px] font-bold uppercase tracking-widest hover:bg-[#a855f7]/[0.15] transition-colors disabled:opacity-40">
+          className="sm:ml-auto px-4 py-1.5 rounded-lg border border-[#a855f7]/30 bg-[#a855f7]/[0.08] text-[#a855f7] text-[10px] font-bold uppercase tracking-widest hover:bg-[#a855f7]/[0.15] transition-colors disabled:opacity-40 self-start sm:self-auto">
           {testing ? "Testing…" : "Test EIF"}
         </button>
       </div>
 
       {hasLive && (
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <Card className="p-6 border-[#a855f7]/[0.12]">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <Card className="p-5 sm:p-6 border-[#a855f7]/[0.12]">
             <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#a855f7]/70 mb-3">EIF Anomaly Score</p>
-            <p className="text-5xl font-black font-mono mb-2" style={{ color: hex(eifScore ?? 0) }}>{f4(eifScore ?? 0, 4)}</p>
+            <p className="text-4xl sm:text-5xl font-black font-mono mb-2" style={{ color: hex(eifScore ?? 0) }}>{f4(eifScore ?? 0, 4)}</p>
             <p className="text-xs text-white/70">Confidence: <span className="text-white/85 font-bold">{f4(eifConf ?? 0, 4)}</span></p>
             <div className="mt-4">
               <Bar label="anomaly score" value={eifScore ?? 0} color={hex(eifScore ?? 0)} />
             </div>
           </Card>
-          <Card className="p-6 border-[#a855f7]/[0.12]">
+          <Card className="p-5 sm:p-6 border-[#a855f7]/[0.12]">
             <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#a855f7]/70 mb-3">Top SHAP Factors</p>
             {Object.keys(shapValues).length > 0 ? (
               <div className="space-y-4">
@@ -899,7 +914,7 @@ function EifSection() {
               </div>
             ) : <p className="text-xs text-white/55">No factor data returned.</p>}
           </Card>
-          <Card className="p-6 border-[#a855f7]/[0.12]">
+          <Card className="p-5 sm:p-6 border-[#a855f7]/[0.12]">
             <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#a855f7]/70 mb-3">EIF Explanation</p>
             {eifExpl ? (
               <p className="text-sm text-white/85 leading-relaxed font-medium">{eifExpl}</p>
@@ -921,8 +936,8 @@ function EifSection() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-5">
-        <Card className="p-7">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <Card className="p-5 sm:p-7">
           <SectionLabel>How EIF Works</SectionLabel>
           <div className="space-y-3">
             {[
@@ -942,7 +957,7 @@ function EifSection() {
           </div>
         </Card>
 
-        <Card className="p-7">
+        <Card className="p-5 sm:p-7">
           <SectionLabel>Feature Space Reference</SectionLabel>
           <div className="space-y-3">
             {[
@@ -956,14 +971,14 @@ function EifSection() {
               <div key={f.l} className="flex items-center gap-4 p-3 rounded-xl border border-white/[0.06]">
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between mb-1.5">
-                    <span className="text-xs text-white/85 font-semibold">{f.l}</span>
-                    <span className="text-xs font-black font-mono" style={{ color: f.c }}>{f4(f.v, 2)}</span>
+                    <span className="text-xs text-white/85 font-semibold truncate mr-2">{f.l}</span>
+                    <span className="text-xs font-black font-mono shrink-0" style={{ color: f.c }}>{f4(f.v, 2)}</span>
                   </div>
                   <div className="h-[3px] w-full bg-white/[0.06] rounded-full overflow-hidden">
                     <div className="h-full rounded-full" style={{ width: `${f.v * 100}%`, background: f.c, boxShadow: `0 0 8px ${f.c}55` }} />
                   </div>
                 </div>
-                <span className="text-[9px] text-white/60 w-32 shrink-0 leading-tight">{f.d}</span>
+                <span className="text-[9px] text-white/60 w-28 shrink-0 leading-tight hidden sm:block">{f.d}</span>
               </div>
             ))}
           </div>
@@ -1028,8 +1043,8 @@ function IdentitySection() {
       <PageHeading eyebrow="Step 4 of Pipeline" title="Identity" accent="Forensics"
         description="JA3 TLS fingerprinting, device hashing, and IP/geo correlation. Runs at Step 4 of the transaction pipeline." />
 
-      <div className={`mb-6 p-4 rounded-2xl border flex items-center gap-3 ${hasLive ? "border-[#CAFF33]/15 bg-[#CAFF33]/[0.04]" : "border-white/[0.07] bg-white/[0.02]"}`}>
-        <div className={`w-2 h-2 rounded-full shrink-0 ${hasLive ? "bg-[#CAFF33]" : "bg-white/30"}`}
+      <div className={`mb-6 p-4 rounded-2xl border flex items-start sm:items-center gap-3 ${hasLive ? "border-[#CAFF33]/15 bg-[#CAFF33]/[0.04]" : "border-white/[0.07] bg-white/[0.02]"}`}>
+        <div className={`w-2 h-2 rounded-full shrink-0 mt-1 sm:mt-0 ${hasLive ? "bg-[#CAFF33]" : "bg-white/30"}`}
           style={hasLive ? { boxShadow: "0 0 8px #CAFF33" } : {}} />
         <p className={`text-sm font-medium ${hasLive ? "text-[#CAFF33]/80" : "text-white/65"}`}>
           {hasLive
@@ -1038,13 +1053,13 @@ function IdentitySection() {
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-5 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-6">
         {signals.map(x => (
-          <Card key={x.t} className="p-6 flex flex-col gap-4">
+          <Card key={x.t} className="p-5 sm:p-6 flex flex-col gap-4">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-2" style={{ color: `${x.color}80` }}>{x.t}</p>
-                <p className="text-5xl font-black font-mono leading-none"
+                <p className="text-4xl sm:text-5xl font-black font-mono leading-none"
                   style={{ color: x.v > x.w ? "#ef4444" : x.color }}>{x.v}</p>
                 <p className="text-xs text-white/65 mt-1">accounts sharing this fingerprint</p>
               </div>
@@ -1066,7 +1081,7 @@ function IdentitySection() {
         ))}
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { n:"1", t:"JA3 Fingerprint",    d:"TLS ClientHello hash — identifies the SSL library regardless of IP. One malicious tool = one fingerprint, even across thousands of accounts.", c:"#CAFF33" },
           { n:"2", t:"Device Fingerprint", d:"SHA-256 of device attributes. One physical device across many accounts is the strongest mule indicator we track.", c:"#a855f7" },
@@ -1104,26 +1119,26 @@ function FusionSection() {
       <PageHeading eyebrow="Ensemble Layer" title="Risk" accent="Fusion"
         description="Weighted combination of 5 signals computed in Spring Boot. Decision policy applied at ≥0.45 (REVIEW) and ≥0.75 (BLOCK)." />
 
-      <div className={`mb-6 p-4 rounded-2xl border flex items-center gap-3 ${hasLive ? "border-[#CAFF33]/15 bg-[#CAFF33]/[0.04]" : "border-white/[0.07] bg-white/[0.02]"}`}>
+      <div className={`mb-6 p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center gap-3 ${hasLive ? "border-[#CAFF33]/15 bg-[#CAFF33]/[0.04]" : "border-white/[0.07] bg-white/[0.02]"}`}>
         <div className={`w-2 h-2 rounded-full shrink-0 ${hasLive ? "bg-[#CAFF33]" : "bg-white/30"}`}
           style={hasLive ? { boxShadow: "0 0 8px #CAFF33" } : {}} />
         <p className={`text-sm font-medium ${hasLive ? "text-[#CAFF33]/80" : "text-white/65"}`}>
           {hasLive ? "Showing live scores" : "Illustrative values — score a transaction in Simulator for real fusion breakdown."}
         </p>
-        {hasLive && <div className={`ml-auto px-4 py-1.5 rounded-xl border text-sm font-black ${dc(decision)}`}>{decision}</div>}
+        {hasLive && <div className={`sm:ml-auto px-4 py-1.5 rounded-xl border text-sm font-black self-start sm:self-auto ${dc(decision)}`}>{decision}</div>}
       </div>
 
-      <div className="grid grid-cols-[1.4fr_0.6fr] gap-5">
-        <Card className="p-7 space-y-3">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_0.6fr] gap-5">
+        <Card className="p-5 sm:p-7 space-y-3">
           <SectionLabel>Score Composition · finalRisk = Σ(weight × score)</SectionLabel>
           {components.map(x => (
-            <div key={x.l} className="p-5 rounded-2xl border border-white/[0.07] bg-black/20">
-              <div className="flex justify-between items-start mb-4">
+            <div key={x.l} className="p-4 sm:p-5 rounded-2xl border border-white/[0.07] bg-black/20">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-4">
                 <div>
                   <p className="text-base font-black mb-1" style={{ color: x.c }}>{x.l}</p>
                   <p className="text-xs text-white/70">{x.d}</p>
                 </div>
-                <div className="text-right">
+                <div className="sm:text-right">
                   <p className="text-[9px] text-white/55 mb-1 uppercase tracking-widest">weight × score</p>
                   <p className="text-base font-black font-mono" style={{ color: x.c }}>
                     {x.w} × {f4(x.v, 3)} = {f4(x.w * x.v, 4)}
@@ -1133,19 +1148,19 @@ function FusionSection() {
               <Bar label="score" value={x.v} color={x.c} />
             </div>
           ))}
-          <div className={`p-6 rounded-2xl border ${bg(fusion)}`}>
+          <div className={`p-5 sm:p-6 rounded-2xl border ${bg(fusion)}`}>
             <div className="flex justify-between items-center">
               <div>
                 <p className="text-xs text-white/65 uppercase tracking-widest mb-1">Final Fusion Score</p>
-                <p className={`text-[2.5rem] font-black font-mono leading-none ${tc(fusion)}`}>{f4(fusion, 4)}</p>
+                <p className={`text-3xl sm:text-[2.5rem] font-black font-mono leading-none ${tc(fusion)}`}>{f4(fusion, 4)}</p>
               </div>
-              <div className={`px-6 py-3 rounded-2xl border text-xl font-black ${dc(decision)}`}>{decision}</div>
+              <div className={`px-4 sm:px-6 py-2 sm:py-3 rounded-2xl border text-lg sm:text-xl font-black ${dc(decision)}`}>{decision}</div>
             </div>
           </div>
         </Card>
 
         <div className="flex flex-col gap-4">
-          <Card className="p-6">
+          <Card className="p-5 sm:p-6">
             <SectionLabel>Decision Thresholds</SectionLabel>
             <div className="space-y-2">
               {([
@@ -1163,7 +1178,7 @@ function FusionSection() {
               })}
             </div>
           </Card>
-          <Card className="p-6 flex-1">
+          <Card className="p-5 sm:p-6 flex-1">
             <SectionLabel>Weights · Spring Boot combineRiskSignals</SectionLabel>
             <div className="space-y-3">
               {components.map(x => (
@@ -1211,7 +1226,7 @@ function RingsSection() {
       <PageHeading eyebrow="Money-Laundering Patterns" title="Ring" accent="Detection"
         description="Bounded DFS cycle detection. 25s timeout, max 6 hops, restricted to account nodes only. Pre-cached at GNN service startup." />
 
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
         <StatCard label="Rings Detected"  value={loading ? "…" : data ? data.rings_detected : "—"}
           sub={error ? "Service unreachable" : "Pre-cached at startup"} accent="#ef4444" />
         <StatCard label="Volume at Risk"
@@ -1222,9 +1237,9 @@ function RingsSection() {
         <StatCard label="Algorithm" value="DFS" sub="25s timeout · max 6 hops · deduped" />
       </div>
 
-      <div className="grid grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <Card className="overflow-hidden">
-          <div className="px-6 py-4 border-b border-white/[0.07] flex justify-between items-center">
+          <div className="px-5 sm:px-6 py-4 border-b border-white/[0.07] flex justify-between items-center">
             <p className="text-[10px] font-black uppercase tracking-[0.25em] text-white/70">Detected Rings</p>
             <LiveBadge loading={loading} error={error} />
           </div>
@@ -1257,14 +1272,14 @@ function RingsSection() {
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-5 sm:p-6">
           {sel ? (
             <div className="space-y-5">
               <div>
                 <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/65 mb-2">Ring Detail</p>
                 <p className={`text-2xl font-black ${tc(sel.risk)}`}>{deriveShape(sel.size)} Pattern</p>
               </div>
-              <div className="flex gap-8 items-center">
+              <div className="flex flex-col sm:flex-row gap-5 sm:items-center">
                 <Gauge score={sel.risk} label="Ring Risk" />
                 <div className="flex-1">
                   {([
@@ -1325,15 +1340,15 @@ function ClustersSection() {
     <div>
       <PageHeading eyebrow="Community Detection" title="Cluster" accent="Report"
         description="Greedy modularity maximisation across the full account transaction graph. Community fraud rates are propagated as node features during GNN training." />
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
         <StatCard label="Communities" value={total || "—"}    sub={error ? "Service unreachable" : "Greedy modularity"} />
         <StatCard label="High Risk"   value={highRisk || "—"} sub=">30% fraud rate" color="text-red-400" />
         <StatCard label="Shown"       value={clusters.length || "—"} sub="Top by community fraud rate" color="text-yellow-400" />
         <StatCard label="Algorithm"   value="Louvain" sub="nx.greedy_modularity_communities" />
       </div>
-      <div className="grid grid-cols-[1.4fr_0.6fr] gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_0.6fr] gap-5">
         <Card className="overflow-hidden">
-          <div className="px-6 py-4 border-b border-white/[0.05] flex justify-between items-center">
+          <div className="px-5 sm:px-6 py-4 border-b border-white/[0.05] flex justify-between items-center">
             <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/70">Top Clusters by Fraud Rate</p>
             <LiveBadge loading={loading} error={error} />
           </div>
@@ -1341,46 +1356,48 @@ function ClustersSection() {
             <p className="text-sm text-white/70 py-8 text-center px-6 font-medium">{error ? "Service unreachable" : "No data — run feature_engineering.py first"}</p>
           )}
           {clusters.length > 0 && (
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-white/[0.04]">
-                  {["Node ID", "Labelled Fraud", "Community Fraud Rate", "Risk Tier"].map(h => (
-                    <th key={h} className="px-5 py-3 text-left text-[9px] font-bold uppercase tracking-widest text-white/70">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {clusters.map((c: any, i: number) => (
-                  <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.015] transition-colors">
-                    <td className="px-5 py-4 text-[#CAFF33] font-mono text-sm font-bold">{c.node_id}</td>
-                    <td className="px-5 py-4">
-                      <Pill className={c.is_fraud ? "bg-red-500/10 border border-red-500/15 text-red-400" : "bg-[#CAFF33]/10 border border-[#CAFF33]/15 text-[#CAFF33]"}>
-                        {c.is_fraud ? "YES" : "NO"}
-                      </Pill>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-4">
-                        <div className="h-px w-20 bg-white/[0.06] relative">
-                          <div className="absolute inset-y-0 left-0 h-px rounded-full" style={{ width: `${(c.community_fraud_rate ?? 0) * 100}%`, background: hex(c.community_fraud_rate ?? 0), boxShadow: `0 0 6px ${hex(c.community_fraud_rate ?? 0)}66` }} />
-                        </div>
-                        <span className="text-xs font-bold font-mono" style={{ color: hex(c.community_fraud_rate ?? 0) }}>
-                          {((c.community_fraud_rate ?? 0) * 100).toFixed(1)}%
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <Pill className={dc((c.community_fraud_rate ?? 0) >= 0.6 ? "BLOCK" : (c.community_fraud_rate ?? 0) >= 0.3 ? "REVIEW" : "APPROVE")}>
-                        {(c.community_fraud_rate ?? 0) >= 0.6 ? "Critical" : (c.community_fraud_rate ?? 0) >= 0.3 ? "High" : "Low"}
-                      </Pill>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[500px]">
+                <thead>
+                  <tr className="border-b border-white/[0.04]">
+                    {["Node ID", "Labelled Fraud", "Community Fraud Rate", "Risk Tier"].map(h => (
+                      <th key={h} className="px-4 sm:px-5 py-3 text-left text-[9px] font-bold uppercase tracking-widest text-white/70">{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {clusters.map((c: any, i: number) => (
+                    <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.015] transition-colors">
+                      <td className="px-4 sm:px-5 py-4 text-[#CAFF33] font-mono text-sm font-bold">{c.node_id}</td>
+                      <td className="px-4 sm:px-5 py-4">
+                        <Pill className={c.is_fraud ? "bg-red-500/10 border border-red-500/15 text-red-400" : "bg-[#CAFF33]/10 border border-[#CAFF33]/15 text-[#CAFF33]"}>
+                          {c.is_fraud ? "YES" : "NO"}
+                        </Pill>
+                      </td>
+                      <td className="px-4 sm:px-5 py-4">
+                        <div className="flex items-center gap-3 sm:gap-4">
+                          <div className="h-px w-16 sm:w-20 bg-white/[0.06] relative">
+                            <div className="absolute inset-y-0 left-0 h-px rounded-full" style={{ width: `${(c.community_fraud_rate ?? 0) * 100}%`, background: hex(c.community_fraud_rate ?? 0), boxShadow: `0 0 6px ${hex(c.community_fraud_rate ?? 0)}66` }} />
+                          </div>
+                          <span className="text-xs font-bold font-mono" style={{ color: hex(c.community_fraud_rate ?? 0) }}>
+                            {((c.community_fraud_rate ?? 0) * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 sm:px-5 py-4">
+                        <Pill className={dc((c.community_fraud_rate ?? 0) >= 0.6 ? "BLOCK" : (c.community_fraud_rate ?? 0) >= 0.3 ? "REVIEW" : "APPROVE")}>
+                          {(c.community_fraud_rate ?? 0) >= 0.6 ? "Critical" : (c.community_fraud_rate ?? 0) >= 0.3 ? "High" : "Low"}
+                        </Pill>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </Card>
         <div className="flex flex-col gap-4">
-          <Card className="p-6 flex-1">
+          <Card className="p-5 sm:p-6 flex-1">
             <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/70 mb-5">Distribution</p>
             {([
               ["Critical (>60%)", Math.round(highRisk * 0.4), "#ef4444"],
@@ -1438,15 +1455,15 @@ function BlockchainSection() {
     <div>
       <PageHeading eyebrow="Immutable Audit Trail" title="Blockchain" accent="Ledger"
         description="SHA256 leaf hashes, Merkle tree batching, async Step 14. Every fraud decision is committed on-chain. No PII stored." />
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
         <StatCard label="Status"       value="LIVE"      sub="50 events / 5s batching"    accent="#CAFF33" />
         <StatCard label="Merkle Depth" value="6"         sub="SHA256 leaf hash"            accent="#a855f7" />
         <StatCard label="Latest Block" value={`#${liveEvents[0]?.block ?? 19823441}`} sub="Last committed batch" accent="#3b82f6" />
         <StatCard label="Immutability" value="100%"      sub="No PII on-chain"             accent="#facc15" />
       </div>
-      <div className="grid grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <Card className="overflow-hidden">
-          <div className="px-6 py-4 border-b border-white/[0.07] flex justify-between items-center">
+          <div className="px-5 sm:px-6 py-4 border-b border-white/[0.07] flex justify-between items-center">
             <p className="text-[10px] font-black uppercase tracking-[0.25em] text-white/70">Audit Log</p>
             <LiveBadge loading={loading} error={!stats && !loading} />
           </div>
@@ -1454,9 +1471,9 @@ function BlockchainSection() {
             {liveEvents.map(log => (
               <div key={log.hash}>
                 <div onClick={() => setOpen(open === log.hash ? null : log.hash)}
-                  className="px-5 py-4 hover:bg-white/[0.02] cursor-pointer transition-colors">
-                  <div className="flex justify-between items-center">
-                    <div className="flex gap-3 items-center">
+                  className="px-4 sm:px-5 py-4 hover:bg-white/[0.02] cursor-pointer transition-colors">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                    <div className="flex flex-wrap gap-2 sm:gap-3 items-center">
                       <span className="text-[10px] text-white/65 font-mono font-bold">{log.ts}</span>
                       <Pill className={dc(log.decision)}>{log.decision}</Pill>
                       <span className="text-sm text-white/85 font-semibold">{log.account}</span>
@@ -1478,9 +1495,9 @@ function BlockchainSection() {
           </div>
         </Card>
         <div className="flex flex-col gap-4">
-          <Card className="p-6">
+          <Card className="p-5 sm:p-6">
             <SectionLabel>Merkle Tree — Latest Batch</SectionLabel>
-            <div className="p-4 rounded-xl bg-black/50 border border-white/[0.07] font-mono text-[11px] space-y-1.5">
+            <div className="p-4 rounded-xl bg-black/50 border border-white/[0.07] font-mono text-[11px] space-y-1.5 overflow-x-auto">
               <p className="text-[#CAFF33] font-black">MERKLE ROOT: 0xe4f2…3b91</p>
               <div className="pl-4 border-l border-white/[0.08] space-y-1 mt-2">
                 <p className="text-white/70">L: 0xa3c1…7f22</p>
@@ -1492,7 +1509,7 @@ function BlockchainSection() {
               </div>
             </div>
           </Card>
-          <Card className="p-6 flex-1">
+          <Card className="p-5 sm:p-6 flex-1">
             <SectionLabel>Async Flow (Step 14)</SectionLabel>
             <div className="space-y-3.5">
               {([
@@ -1662,7 +1679,7 @@ function MetricsSection() {
       <PageHeading eyebrow="Evaluation Results" title="Model" accent="Performance"
         description="All three models evaluated equally — live scores from your transaction database plus training benchmarks where available." />
 
-      <div className="grid grid-cols-3 gap-4 mb-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
         {MODELS.map(m => {
           const liveF1  = m.live?.f1Score  ?? 0;
           const liveFpr = m.live?.fpr      ?? 0;
@@ -1670,69 +1687,70 @@ function MetricsSection() {
           const isActive = activeModel === m.id;
           return (
             <button key={m.id} onClick={() => setActiveModel(m.id)}
-              className={`text-left p-5 rounded-[1.5rem] border transition-all duration-200 ${isActive ? `${m.activeBg} ${m.border}` : "border-white/[0.06] bg-[#080808] hover:border-white/[0.1]"}`}>
+              className={`text-left p-4 sm:p-5 rounded-[1.5rem] border transition-all duration-200 ${isActive ? `${m.activeBg} ${m.border}` : "border-white/[0.06] bg-[#080808] hover:border-white/[0.1]"}`}>
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <div className="w-1.5 h-1.5 rounded-full" style={{ background: m.color, boxShadow: `0 0 6px ${m.color}` }} />
-                    <span className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/70">{m.full}</span>
+                    <span className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/70 hidden sm:block">{m.full}</span>
+                    <span className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/70 sm:hidden">{m.label}</span>
                   </div>
-                  <p className="text-3xl font-black" style={{ color: m.color }}>{m.label}</p>
+                  <p className="text-2xl sm:text-3xl font-black" style={{ color: m.color }}>{m.label}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[8px] text-white/60 mb-1">fusion weight</p>
-                  <p className="text-xl font-black" style={{ color: `${m.color}99` }}>{m.weight}</p>
+                  <p className="text-[8px] text-white/60 mb-1">weight</p>
+                  <p className="text-lg sm:text-xl font-black" style={{ color: `${m.color}99` }}>{m.weight}</p>
                 </div>
               </div>
               <div className="flex gap-4 mb-4">
                 <div>
                   <p className="text-[8px] text-white/60 mb-0.5">F1</p>
-                  <p className="text-lg font-black font-mono" style={{ color: m.color }}>
+                  <p className="text-base sm:text-lg font-black font-mono" style={{ color: m.color }}>
                     {liveF1 > 0 ? f4(liveF1, 3) : m.trainF1 > 0 ? f4(m.trainF1, 3) : "—"}
                   </p>
                 </div>
                 <div>
                   <p className="text-[8px] text-white/60 mb-0.5">FPR</p>
-                  <p className="text-lg font-black font-mono text-yellow-400">
+                  <p className="text-base sm:text-lg font-black font-mono text-yellow-400">
                     {liveFpr > 0 ? f4(liveFpr, 3) : "—"}
                   </p>
                 </div>
                 {liveAuc > 0 && (
                   <div>
                     <p className="text-[8px] text-white/60 mb-0.5">AUC</p>
-                    <p className="text-lg font-black font-mono" style={{ color: m.color }}>{f4(liveAuc, 3)}</p>
+                    <p className="text-base sm:text-lg font-black font-mono" style={{ color: m.color }}>{f4(liveAuc, 3)}</p>
                   </div>
                 )}
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-[8px] px-2 py-1 rounded-full border font-bold uppercase tracking-widest"
                   style={{ borderColor: `${m.color}30`, color: `${m.color}80` }}>{m.tag}</span>
-                <span className="text-[8px] text-white/65 font-mono">thr {m.threshold}</span>
+                <span className="text-[8px] text-white/65 font-mono hidden sm:block">thr {m.threshold}</span>
               </div>
             </button>
           );
         })}
       </div>
 
-      <Card className={`p-7 mb-5 border ${active.border}`}>
-        <div className="flex items-center justify-between mb-7">
+      <Card className={`p-5 sm:p-7 mb-5 border ${active.border}`}>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-7">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
               style={{ background: `${active.color}15`, border: `1px solid ${active.color}30` }}>
               <span className="text-sm font-black" style={{ color: active.color }}>{active.label[0]}</span>
             </div>
             <div>
-              <p className="text-xl font-black" style={{ color: active.color }}>{active.full}</p>
+              <p className="text-lg sm:text-xl font-black" style={{ color: active.color }}>{active.full}</p>
               <p className="text-xs text-white/70 mt-0.5">{active.role}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <LiveBadge loading={loading} error={active.id === "gnn" ? gnnError : springError} />
-            {hasSb && <span className="text-[9px] text-white/65 font-semibold">live on stored transactions</span>}
+            {hasSb && <span className="text-[9px] text-white/65 font-semibold hidden sm:block">live on stored transactions</span>}
           </div>
         </div>
 
-        <div className="grid grid-cols-[1fr_1fr_1fr] gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div>
             <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/65 mb-5">
               {active.live ? "Live Eval (DB)" : active.id === "gnn" ? "Training Eval" : "No Eval Yet"}
@@ -1799,7 +1817,7 @@ function MetricsSection() {
               {active.id === "gnn" && gnnAuc > 0 && (
                 <>
                   <MBar label="AUC-ROC (training)" value={gnnAuc} color={active.color} />
-                  <div className="flex gap-2 pt-2">
+                  <div className="flex gap-2 pt-2 flex-wrap">
                     {gnnF1 > 0.8  && <Pill className="bg-[#CAFF33]/10 border border-[#CAFF33]/20 text-[#CAFF33]">F1 &gt; 0.80 ✓</Pill>}
                     {gnnAuc > 0.9 && <Pill className="bg-[#CAFF33]/10 border border-[#CAFF33]/20 text-[#CAFF33]">AUC &gt; 0.90 ✓</Pill>}
                   </div>
@@ -1840,13 +1858,13 @@ function MetricsSection() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <Card className="overflow-hidden">
-          <div className="px-6 py-4 border-b border-white/[0.05] flex justify-between items-center">
+          <div className="px-5 sm:px-6 py-4 border-b border-white/[0.05] flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
             <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/70">Side-by-Side Comparison</p>
             <div className="flex items-center gap-2">
               <LiveBadge loading={loading} error={springError} />
-              <span className="text-[9px] text-white/65 font-mono">from /api/admin/evaluate-models</span>
+              <span className="text-[9px] text-white/65 font-mono hidden sm:block">from /api/admin/evaluate-models</span>
             </div>
           </div>
           {!hasSb && !loading ? (
@@ -1858,53 +1876,55 @@ function MetricsSection() {
               </p>
             </div>
           ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-white/[0.04]">
-                  <th className="px-5 py-3 text-left text-[9px] font-bold uppercase tracking-widest text-white/70">Metric</th>
-                  {MODELS.map(m => (
-                    <th key={m.id} className="px-4 py-3 text-right text-[9px] font-bold uppercase tracking-widest"
-                      style={{ color: `${m.color}80` }}>{m.label}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {(["f1Score","precision","recall","accuracy","fpr","fnr"] as const).map(metric => {
-                  const label = { f1Score:"F1", precision:"Precision", recall:"Recall", accuracy:"Accuracy", fpr:"FPR ↓", fnr:"FNR ↓" }[metric];
-                  const values = MODELS.map(m => { if (!m.live) return null; return (m.live as any)[metric] ?? null; });
-                  const best = Math.max(...values.filter((v): v is number => v !== null));
-                  return (
-                    <tr key={metric} className="border-b border-white/[0.03] hover:bg-white/[0.01]">
-                      <td className="px-5 py-3 text-[10px] text-white/70 uppercase tracking-widest">{label}</td>
-                      {MODELS.map((m, i) => {
-                        const v = values[i];
-                        const isLower = metric === "fpr" || metric === "fnr";
-                        const minVal = isLower ? Math.min(...values.filter((x): x is number => x !== null)) : 0;
-                        const actuallyBest = isLower ? (v !== null && Math.abs(v - minVal) < 0.0001) : (v !== null && Math.abs(v - best) < 0.0001);
-                        return (
-                          <td key={m.id} className="px-4 py-3 text-right">
-                            {v !== null ? (
-                              <span className={`text-xs font-black font-mono ${actuallyBest ? "" : "text-white/70"}`}
-                                style={actuallyBest ? { color: m.color } : {}}>
-                                {f4(v, 4)}
-                                {actuallyBest && <span className="ml-1 text-[8px] opacity-60">★</span>}
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-white/60">—</span>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[380px]">
+                <thead>
+                  <tr className="border-b border-white/[0.04]">
+                    <th className="px-4 sm:px-5 py-3 text-left text-[9px] font-bold uppercase tracking-widest text-white/70">Metric</th>
+                    {MODELS.map(m => (
+                      <th key={m.id} className="px-3 sm:px-4 py-3 text-right text-[9px] font-bold uppercase tracking-widest"
+                        style={{ color: `${m.color}80` }}>{m.label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(["f1Score","precision","recall","accuracy","fpr","fnr"] as const).map(metric => {
+                    const label = { f1Score:"F1", precision:"Precision", recall:"Recall", accuracy:"Accuracy", fpr:"FPR ↓", fnr:"FNR ↓" }[metric];
+                    const values = MODELS.map(m => { if (!m.live) return null; return (m.live as any)[metric] ?? null; });
+                    const best = Math.max(...values.filter((v): v is number => v !== null));
+                    return (
+                      <tr key={metric} className="border-b border-white/[0.03] hover:bg-white/[0.01]">
+                        <td className="px-4 sm:px-5 py-3 text-[10px] text-white/70 uppercase tracking-widest">{label}</td>
+                        {MODELS.map((m, i) => {
+                          const v = values[i];
+                          const isLower = metric === "fpr" || metric === "fnr";
+                          const minVal = isLower ? Math.min(...values.filter((x): x is number => x !== null)) : 0;
+                          const actuallyBest = isLower ? (v !== null && Math.abs(v - minVal) < 0.0001) : (v !== null && Math.abs(v - best) < 0.0001);
+                          return (
+                            <td key={m.id} className="px-3 sm:px-4 py-3 text-right">
+                              {v !== null ? (
+                                <span className={`text-xs font-black font-mono ${actuallyBest ? "" : "text-white/70"}`}
+                                  style={actuallyBest ? { color: m.color } : {}}>
+                                  {f4(v, 4)}
+                                  {actuallyBest && <span className="ml-1 text-[8px] opacity-60">★</span>}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-white/60">—</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </Card>
 
         <div className="flex flex-col gap-4">
-          <Card className="p-6">
+          <Card className="p-5 sm:p-6">
             <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/70 mb-4">System Status</p>
             <div className="grid grid-cols-2 gap-3">
               {[
@@ -1920,17 +1940,17 @@ function MetricsSection() {
               ))}
             </div>
           </Card>
-          <Card className="p-6 flex-1">
+          <Card className="p-5 sm:p-6 flex-1">
             <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/70 mb-4">Decision Thresholds</p>
             <div className="space-y-3">
               {MODELS.map(m => (
                 <div key={m.id} className="flex items-center gap-3 p-3 rounded-xl border border-white/[0.04]">
                   <div className="w-1.5 h-6 rounded-full" style={{ background: m.color, boxShadow: `0 0 8px ${m.color}88` }} />
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <p className="text-[10px] font-bold" style={{ color: m.color }}>{m.label}</p>
-                    <p className="text-[9px] text-white/65">{m.full}</p>
+                    <p className="text-[9px] text-white/65 truncate">{m.full}</p>
                   </div>
-                  <span className="text-[11px] font-black font-mono text-white/70">{m.threshold}</span>
+                  <span className="text-[11px] font-black font-mono text-white/70 shrink-0">{m.threshold}</span>
                 </div>
               ))}
             </div>
@@ -1950,6 +1970,7 @@ export default function FraudDashboard() {
   const [active,      setActive]      = useState<View>("simulator");
   const [stats,       setStats]       = useState<any>(null);
   const [lastResult,  setLastResult]  = useState<LastResult | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     fetch(`${API_URL}/api/admin/stats`)
@@ -1976,60 +1997,94 @@ export default function FraudDashboard() {
     { label: "Analytics", items: NAV.slice(6, 9) },
   ];
 
+  const SidebarContent = () => (
+    <>
+      <div className="mb-7 px-3">
+        <div className="flex items-center gap-2.5 mb-1">
+          <div className="w-6 h-6 rounded-lg bg-[#CAFF33]/15 border border-[#CAFF33]/25 flex items-center justify-center">
+            <div className="w-2.5 h-2.5 rounded-sm bg-[#CAFF33]" />
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/70">MuleHunter AI</p>
+            <p className="text-[9px] text-white/60 font-mono">Fraud Intelligence</p>
+          </div>
+        </div>
+      </div>
+
+      <nav className="flex-1 space-y-5">
+        {NAV_GROUPS.map(group => (
+          <div key={group.label}>
+            <p className="text-[8px] font-black uppercase tracking-[0.3em] text-white/60 px-3 mb-1">{group.label}</p>
+            <div className="space-y-0.5">
+              {group.items.map(({ id, label, icon: Icon }) => (
+                <button key={id} onClick={() => { setActive(id); setSidebarOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-150 group ${active === id ? "bg-[#CAFF33]/[0.1] border border-[#CAFF33]/20" : "border border-transparent hover:bg-white/[0.03] hover:border-white/[0.06]"}`}>
+                  <Icon className={`w-4 h-4 shrink-0 transition-colors ${active === id ? "text-[#CAFF33]" : "text-white/65 group-hover:text-white/80"}`} />
+                  <span className={`text-[12px] font-semibold tracking-tight ${active === id ? "text-[#CAFF33]" : "text-white/70 group-hover:text-white/90"}`}>{label}</span>
+                  {active === id && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#CAFF33]" style={{ boxShadow: "0 0 6px #CAFF33" }} />}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      <div className="mt-4 pt-4 border-t border-white/[0.07] px-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[9px] text-white/60 uppercase tracking-widest font-bold">GNN</span>
+          <span className="text-[9px] text-[#CAFF33]/70 font-mono">:8001</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-[9px] text-white/60 uppercase tracking-widest font-bold">EIF</span>
+          <span className="text-[9px] text-purple-400/70 font-mono">:8000</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-[9px] text-white/60 uppercase tracking-widest font-bold">API</span>
+          <span className="text-[9px] text-blue-400/70 font-mono">:8082</span>
+        </div>
+      </div>
+    </>
+  );
+
   return (
     <LastResultCtx.Provider value={{ result: lastResult, setResult: setLastResult }}>
     <div className="bg-[#060606] text-white min-h-screen flex flex-col">
       <Navbar />
+
+      {/* Mobile top bar */}
+      <div className="lg:hidden sticky top-0 z-40 flex items-center justify-between px-4 py-3 bg-[#070707] border-b border-white/[0.07]">
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 rounded-md bg-[#CAFF33]/15 border border-[#CAFF33]/25 flex items-center justify-center">
+            <div className="w-2 h-2 rounded-sm bg-[#CAFF33]" />
+          </div>
+          <span className="text-[11px] font-black uppercase tracking-[0.2em] text-white/80">
+            {NAV.find(n => n.id === active)?.label ?? "Dashboard"}
+          </span>
+        </div>
+        <button onClick={() => setSidebarOpen(o => !o)}
+          className="w-8 h-8 rounded-xl border border-white/[0.1] flex items-center justify-center">
+          {sidebarOpen ? <X className="w-4 h-4 text-white/70" /> : <Menu className="w-4 h-4 text-white/70" />}
+        </button>
+      </div>
+
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
+          <aside className="relative w-64 bg-[#070707] border-r border-white/[0.07] flex flex-col py-6 px-3 overflow-y-auto">
+            <SidebarContent />
+          </aside>
+        </div>
+      )}
+
       <div className="flex flex-1 overflow-hidden">
-        <aside className="w-56 shrink-0 border-r border-white/[0.07] flex flex-col py-6 px-3 sticky top-0 h-screen overflow-y-auto bg-[#070707]">
-          <div className="mb-7 px-3">
-            <div className="flex items-center gap-2.5 mb-1">
-              <div className="w-6 h-6 rounded-lg bg-[#CAFF33]/15 border border-[#CAFF33]/25 flex items-center justify-center">
-                <div className="w-2.5 h-2.5 rounded-sm bg-[#CAFF33]" />
-              </div>
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/70">MuleHunter AI</p>
-                <p className="text-[9px] text-white/60 font-mono">Fraud Intelligence</p>
-              </div>
-            </div>
-          </div>
-
-          <nav className="flex-1 space-y-5">
-            {NAV_GROUPS.map(group => (
-              <div key={group.label}>
-                <p className="text-[8px] font-black uppercase tracking-[0.3em] text-white/60 px-3 mb-1">{group.label}</p>
-                <div className="space-y-0.5">
-                  {group.items.map(({ id, label, icon: Icon }) => (
-                    <button key={id} onClick={() => setActive(id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-150 group ${active === id ? "bg-[#CAFF33]/[0.1] border border-[#CAFF33]/20" : "border border-transparent hover:bg-white/[0.03] hover:border-white/[0.06]"}`}>
-                      <Icon className={`w-4 h-4 shrink-0 transition-colors ${active === id ? "text-[#CAFF33]" : "text-white/65 group-hover:text-white/80"}`} />
-                      <span className={`text-[12px] font-semibold tracking-tight ${active === id ? "text-[#CAFF33]" : "text-white/70 group-hover:text-white/90"}`}>{label}</span>
-                      {active === id && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#CAFF33]" style={{ boxShadow: "0 0 6px #CAFF33" }} />}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </nav>
-
-          <div className="mt-4 pt-4 border-t border-white/[0.07] px-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] text-white/60 uppercase tracking-widest font-bold">GNN</span>
-              <span className="text-[9px] text-[#CAFF33]/70 font-mono">:8001</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] text-white/60 uppercase tracking-widest font-bold">EIF</span>
-              <span className="text-[9px] text-purple-400/70 font-mono">:8000</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] text-white/60 uppercase tracking-widest font-bold">API</span>
-              <span className="text-[9px] text-blue-400/70 font-mono">:8082</span>
-            </div>
-          </div>
+        {/* Desktop sidebar */}
+        <aside className="hidden lg:flex w-56 shrink-0 border-r border-white/[0.07] flex-col py-6 px-3 sticky top-0 h-screen overflow-y-auto bg-[#070707]">
+          <SidebarContent />
         </aside>
 
         <main className="flex-1 overflow-y-auto bg-[#060606]">
-          <div className="max-w-[1300px] mx-auto px-8 py-10">
+          <div className="max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
             {SECTIONS[active]}
           </div>
         </main>
