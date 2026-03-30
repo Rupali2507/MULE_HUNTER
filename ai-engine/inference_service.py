@@ -74,6 +74,7 @@ EVAL_PATH  = SHARED_DATA / "eval_report.json"
 
 RING_TIMEOUT_SEC = 20   # startup ring pre-cache budget
 MAX_RINGS_CACHED = 200
+UNKNOWN_NODE_CACHE_MAX = 10_000
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -274,6 +275,7 @@ _rings_cache: List[Dict[str, Any]] = []
 
 # [FIX 2] Logit cache for known nodes (avoids re-running full forward pass)
 _logit_cache: Dict[str, tuple[float, float, float]] = {}  # node_id → (risk, conf, emb_norm)
+_unknown_cache: Dict[str, tuple[float, float, float]] = {}
 
 _initialized = False
 _init_lock   = Lock()
@@ -396,7 +398,7 @@ def load_assets() -> None:
         # Build NetworkX graph (for ring detection + neighbour queries)
         tx_path = SHARED_DATA / "transactions.csv"
         if tx_path.exists():
-            df_tx = pd.read_csv(tx_path, nrows=50_000)
+            df_tx = pd.read_csv(tx_path)
             df_tx["amount"] = pd.to_numeric(df_tx["amount"], errors="coerce").fillna(1.0)
             df_tx = df_tx.rename(columns={"amount": "weight"})
             nx_graph = nx.from_pandas_edgelist(
@@ -445,8 +447,11 @@ def _new_node_features(norm: Optional[dict]) -> torch.Tensor:
     we map 0.5 back to normalised coords correctly — otherwise we default
     to 0.5 uniformly (neutral, not suspiciously low).
     """
-    n_features = base_graph.x.shape[1] if base_graph is not None else len(FEATURE_COLS)
-    return torch.full((1, n_features), 0.5)
+    if base_graph is not None and base_graph.x.numel() > 0:
+        med = torch.median(base_graph.x, dim=0).values
+        return med.unsqueeze(0).to(dtype=torch.float)
+    n_features = len(FEATURE_COLS)
+    return torch.full((1, n_features), 0.5, dtype=torch.float)
 
 
 def _infer_known_node(
@@ -485,6 +490,9 @@ def _infer_new_node(
         risk neighbour should elevate an otherwise neutral account.
     """
     # ── Step 1: MLP-only forward pass ─────────────────────────────────────
+    if account_id in _unknown_cache:
+        return _unknown_cache[account_id]
+
     x          = base_graph.x.clone()
     edge_index = base_graph.edge_index.clone()
 
@@ -522,7 +530,34 @@ def _infer_new_node(
                 account_id, float(probs[1]), nb_mean, nb_max, mlp_risk,
             )
 
-    return mlp_risk, conf, embnm
+    out = (mlp_risk, conf, embnm)
+    if len(_unknown_cache) >= UNKNOWN_NODE_CACHE_MAX:
+        _unknown_cache.pop(next(iter(_unknown_cache)))
+    _unknown_cache[account_id] = out
+    return out
+
+
+def _amount_risk_adjustment(amount: float) -> float:
+    """
+    Transaction-level correction layered on top of account-level risk.
+    Negative shift for tiny transfers avoids over-flagging token amounts.
+    """
+    amt = max(0.0, float(amount))
+    if amt < 50:
+        return -0.12
+    if amt < 200:
+        return -0.08
+    if amt < 1_000:
+        return -0.04
+    if amt < 10_000:
+        return 0.00
+    if amt < 50_000:
+        return 0.03
+    return 0.06
+
+
+def _transaction_adjusted_risk(base_risk: float, amount: float) -> float:
+    return float(np.clip(base_risk + _amount_risk_adjustment(amount), 0.0, 1.0))
 
 
 def _get_node_features(account_id: str) -> dict:
@@ -670,9 +705,10 @@ def analyze(tx: TransactionRequest) -> RiskResponse:
     is_known   = src in _logit_cache
 
     if is_known:
-        risk, conf, _ = _infer_known_node(src)
+        base_risk, conf, _ = _infer_known_node(src)
     else:
-        risk, conf, _ = _infer_new_node(src)
+        base_risk, conf, _ = _infer_new_node(src)
+    risk = _transaction_adjusted_risk(base_risk, tx.amount)
 
     features  = _get_node_features(src)
     threshold = float(model_meta.get("optimal_threshold", 0.5)) if model_meta else 0.5
@@ -731,9 +767,10 @@ def analyze_batch(req: BatchRequest) -> dict:
             t0  = time.perf_counter()
             src = str(tx.source_id)
             if src in _logit_cache:
-                risk, _, _ = _infer_known_node(src)
+                base_risk, _, _ = _infer_known_node(src)
             else:
-                risk, _, _ = _infer_new_node(src)
+                base_risk, _, _ = _infer_new_node(src)
+            risk = _transaction_adjusted_risk(base_risk, tx.amount)
             lat     = (time.perf_counter() - t0) * 1_000
             verdict = "CRITICAL" if risk > block else "SUSPICIOUS" if risk > threshold else "SAFE"
             results.append({
@@ -783,7 +820,7 @@ def cluster_report() -> ClusterReport:
     ].to_dict("records")
 
     return ClusterReport(
-        total_clusters     =int(node_df["community_fraud_rate"].nunique()),
+        total_clusters     =int(node_df["community_id"].nunique()),
         high_risk_clusters =int(dist.get("High", 0) + dist.get("Critical", 0)),
         top_clusters       =top_nodes,
     )
@@ -854,12 +891,26 @@ def gnn_score(request: GnnScoreRequest) -> GnnScoreResponse:
         g.suspiciousNeighborCount > 0
         or g.twoHopFraudDensity   > 0
         or g.connectivityScore    > 0
+        or request.behaviorFeatures.velocity > 0
+        or request.behaviorFeatures.burst > 0
+        or request.identityFeatures.deviceReuse > 0
+        or request.identityFeatures.ipReuse > 0
     )
     if has_context:
         neighbor_signal = min(1.0, g.suspiciousNeighborCount / 10.0)
         hop_density     = max(0.0, min(1.0, g.twoHopFraudDensity))
+        velocity        = max(0.0, min(1.0, request.behaviorFeatures.velocity))
+        burst           = max(0.0, min(1.0, request.behaviorFeatures.burst))
+        device_reuse    = min(1.0, request.identityFeatures.deviceReuse / 10.0)
+        ip_reuse        = min(1.0, request.identityFeatures.ipReuse / 10.0)
         gnn_score_val   = float(np.clip(
-            0.70 * raw_score + 0.20 * hop_density + 0.10 * neighbor_signal,
+            0.68 * raw_score
+            + 0.16 * hop_density
+            + 0.08 * neighbor_signal
+            + 0.04 * velocity
+            + 0.02 * burst
+            + 0.01 * device_reuse
+            + 0.01 * ip_reuse,
             0.0, 1.0,
         ))
     else:

@@ -312,13 +312,22 @@ Each account gets a role: **HUB** (coordinator) · **BRIDGE** (high betweenness)
 ```json
 // Request
 { "accountId": "12345_visa_debit",
-  "graphFeatures": { "suspiciousNeighborCount": 4, "twoHopFraudDensity": 0.47 } }
+  "graphFeatures": { "suspiciousNeighborCount": 4, "twoHopFraudDensity": 0.47 },
+  "identityFeatures": { "deviceReuse": 2, "ipReuse": 1 },
+  "behaviorFeatures": { "velocity": 0.35, "burst": 0.20 } }
 
 // Response (key fields)
 { "gnnScore": 0.891, "confidence": 0.782, "riskLevel": "HIGH",
   "muleRingDetection": { "isMuleRingMember": true, "ringShape": "STAR", "role": "MULE" },
   "riskFactors": ["Embedded in a high-risk fraud community", "member_of_star_mule_ring"] }
 ```
+
+Scoring blend (backward-compatible endpoint, improved calibration):
+
+- If only account graph state is provided, score is account-risk driven.
+- When context fields are provided, runtime blend is:
+  `0.68*raw + 0.16*twoHopFraudDensity + 0.08*suspiciousNeighborSignal + 0.04*velocity + 0.02*burst + 0.01*deviceReuse + 0.01*ipReuse`
+- All context terms are clipped to `[0,1]` before blending.
 
 ### All Endpoints
 
@@ -341,7 +350,13 @@ Each account gets a role: **HUB** (coordinator) · **BRIDGE** (high betweenness)
 
 **AUC for early stopping, not F1** — F1 at a fixed 0.5 threshold is noisy during training. AUC is threshold-free and monotonically tracks discriminative power. Threshold search runs once post-training on val set.
 
-**O(1) inference** — Single batched forward pass at startup caches `(risk, confidence, embedding_norm)` for all 14,318 known nodes. Unknown accounts get neutral 0.5 features → MLP-only scoring (no message-passing).
+**O(1) inference for known nodes** — Single batched forward pass at startup caches `(risk, confidence, embedding_norm)` for all known nodes. Unknown-account results are memoized with an LRU-style cap to avoid repeated recomputation hot-spots.
+
+**Transaction-aware runtime scoring** — `/analyze-transaction` and `/analyze-batch` keep the same schema but now apply an amount-sensitive calibration on top of account risk. Tiny "probe" amounts are down-weighted to reduce false alarms while large-value transfers get a mild positive bump.
+
+**Stable unknown-node baseline** — Unseen accounts use per-feature median values from the training tensor (not a flat constant vector), then optional neighbour blending if graph neighbours are known.
+
+**Full-graph runtime context** — Inference now loads the complete `transactions.csv` for neighbour/ring context instead of truncating to the first 50k rows, improving consistency between training and serving.
 
 **Account-only ring detection** — Location nodes form spurious cycles through shared merchant addresses. Restricting the DFS subgraph to account nodes only eliminates all false rings.
 
