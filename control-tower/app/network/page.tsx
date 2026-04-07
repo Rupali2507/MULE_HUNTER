@@ -8,7 +8,6 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import type { GraphNode } from "../components/graph/FraudGraph3D";
 
-// Three.js graph — client only
 const FraudGraph3D = dynamic(
   () => import("../components/graph/FraudGraph3D"),
   { ssr: false }
@@ -18,14 +17,14 @@ export default function NetworkPage() {
   // ── Node selection ──
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
 
-  // ── Filter state (owned here, passed to both sidebar + graph) ──
+  // ── Filter state ──
   const [riskThreshold, setRiskThreshold] = useState<number>(0);
   const [showOnlyFraud, setShowOnlyFraud] = useState<boolean>(false);
   const [showOnlyRings, setShowOnlyRings] = useState<boolean>(false);
   const [searchId, setSearchId] = useState<string>("");
   const [searchTrigger, setSearchTrigger] = useState<string>("");
 
-  // Stats (lifted from graph via callback)
+  // ── Stats lifted from graph ──
   const [stats, setStats] = useState({ totalNodes: 0, fraudNodes: 0, rings: 0 });
 
   const handleSearch = useCallback(() => {
@@ -45,8 +44,8 @@ export default function NetworkPage() {
     <div className="flex flex-col h-screen overflow-hidden bg-black">
       <Navbar />
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* ── Left sidebar: filter controls ── */}
+      <div className="flex flex-1 overflow-hidden min-h-0">
+        {/* Left sidebar */}
         <GraphControls
           riskThreshold={riskThreshold}
           setRiskThreshold={setRiskThreshold}
@@ -63,8 +62,8 @@ export default function NetworkPage() {
           rings={stats.rings}
         />
 
-        {/* ── 3D Graph canvas ── */}
-        <div className="flex-1 relative overflow-hidden">
+        {/* 3D Graph canvas — fills remaining space */}
+        <div className="flex-1 relative min-w-0 min-h-0">
           <FraudGraph3D
             onNodeSelect={setSelectedNode}
             selectedNode={selectedNode}
@@ -72,10 +71,11 @@ export default function NetworkPage() {
             showOnlyFraud={showOnlyFraud}
             showOnlyRings={showOnlyRings}
             searchId={searchTrigger}
+            onStatsUpdate={setStats}
           />
         </div>
 
-        {/* ── Right panel: node inspector ── */}
+        {/* Right panel: node inspector */}
         {selectedNode && (
           <NodeInspector
             node={selectedNode}

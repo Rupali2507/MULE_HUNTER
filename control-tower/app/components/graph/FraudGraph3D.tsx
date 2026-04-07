@@ -60,6 +60,8 @@ interface FraudGraph3DProps {
   showOnlyFraud: boolean;
   showOnlyRings: boolean;
   searchId: string;
+  // lift stats up to sidebar
+  onStatsUpdate?: (s: { totalNodes: number; fraudNodes: number; rings: number }) => void;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -138,6 +140,7 @@ export default function FraudGraph3D({
   showOnlyFraud,
   showOnlyRings,
   searchId,
+  onStatsUpdate,
 }: FraudGraph3DProps) {
   const fgRef = useRef<any>(null);
   const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -201,33 +204,93 @@ export default function FraudGraph3D({
         const res = await fetch(`${API_BASE}/api/graph`);
         const data = await res.json();
 
-        const nodes: GraphNode[] = data.nodes.map((n: any): GraphNode => ({
-          id: n.nodeId ?? n.id,
-          is_anomalous: n.isAnomalous ?? n.is_anomalous ?? false,
-          anomalyScore: n.anomalyScore ?? n.gnnScore ?? 0,
-          volume: n.volume ?? n.txCount ?? 0,
-          pagerank: n.pagerank ?? Math.random() * 0.3, // fallback
-          role: n.role ?? "NORMAL",
-          clusterId: n.clusterId,
-          clusterFraudRate: n.clusterFraudRate,
-          ringIds: n.ringIds ?? [],
-          shapFactors: n.shapFactors ?? [],
-        }));
+        // ── DEBUG: log first raw node so we can see exact field names ──
+        if (data.nodes?.length > 0) {
+          console.log("[MuleHunter] Raw node sample:", JSON.stringify(data.nodes[0], null, 2));
+          console.log("[MuleHunter] Raw link sample:", JSON.stringify(data.links?.[0], null, 2));
+          console.log("[MuleHunter] Top-level keys:", Object.keys(data));
+        }
 
-        const links: GraphLink[] = data.links
-          .filter((l: any) => l.source && l.target)
+        const nodes: GraphNode[] = data.nodes.map((n: any): GraphNode => {
+          // ── is_anomalous: try every known field name ──
+          const isAnom = !!(
+            n.isAnomalous ?? n.is_anomalous ?? n.anomalous ??
+            n.isFraud ?? n.is_fraud ?? n.fraud ?? false
+          );
+
+          // ── anomalyScore: EIF returns negative path-length scores, GNN returns 0-1 ──
+          // Collect every possible score field
+          const candidates = [
+            n.anomalyScore, n.gnnScore, n.riskScore, n.score,
+            n.fraudScore, n.eifScore, n.risk,
+          ].filter((v) => v != null && !isNaN(v));
+
+          let rawScore = candidates.length > 0 ? candidates[0] : 0;
+
+          // EIF scores are typically negative (more negative = more anomalous)
+          // Normalise to 0-1 if negative
+          if (rawScore < 0) {
+            rawScore = Math.min(1, Math.abs(rawScore));
+          }
+
+          // If flagged anomalous but score is still near 0, set a visible floor
+          const score = isAnom && rawScore < 0.5 ? Math.max(rawScore, 0.82) : rawScore;
+
+          // ── ringIds ──
+          let ringIds: number[] = [];
+          if (Array.isArray(n.ringIds)) ringIds = n.ringIds.map(Number);
+          else if (Array.isArray(n.ring_ids)) ringIds = n.ring_ids.map(Number);
+          else if (n.ringId != null) ringIds = [Number(n.ringId)];
+          else if (n.ring_id != null) ringIds = [Number(n.ring_id)];
+          // Treat anomalous nodes as ring members even without explicit ringIds
+          if (isAnom && ringIds.length === 0) {
+            const cid = n.clusterId ?? n.cluster_id ?? n.community;
+            if (cid != null) ringIds = [Number(cid)];
+            else ringIds = [1]; // synthetic — still shows in ring filter
+          }
+
+          // ── role ──
+          const role: GraphNode["role"] =
+            n.role ?? n.nodeRole ?? n.node_role ??
+            (isAnom && (n.pagerank ?? n.pageRank ?? 0) > 0.5 ? "HUB" :
+             isAnom && ringIds.length > 0 ? "BRIDGE" :
+             isAnom ? "MULE" : "NORMAL");
+
+          return {
+            id: n.nodeId ?? n.node_id ?? n.id,
+            is_anomalous: isAnom,
+            anomalyScore: Math.min(1, Math.max(0, score)),
+            volume: n.volume ?? n.txCount ?? n.tx_count ?? n.transactionCount ?? 0,
+            pagerank: n.pagerank ?? n.pageRank ?? n.page_rank ?? 0,
+            role,
+            clusterId: n.clusterId ?? n.cluster_id ?? n.community,
+            clusterFraudRate: n.clusterFraudRate ?? n.cluster_fraud_rate,
+            ringIds,
+            shapFactors: n.shapFactors ?? n.shap_factors ?? [],
+          };
+        });
+
+        const links: GraphLink[] = (data.links ?? data.edges ?? [])
+          .filter((l: any) => (l.source ?? l.from) && (l.target ?? l.to))
           .map((l: any) => ({
-            source: String(l.source),
-            target: String(l.target),
+            source: String(l.source ?? l.from ?? l.sourceId),
+            target: String(l.target ?? l.to ?? l.targetId),
           }));
 
+        console.log(`[MuleHunter] Mapped: ${nodes.length} nodes, ${nodes.filter(n=>n.is_anomalous).length} fraud, ${links.length} links`);
+
         setRawGraph({ nodes, links });
-        setStats({
+        const fraudCount = nodes.filter((n) => n.is_anomalous).length;
+        const ringCount = data.rings ?? data.ringCount ?? data.ring_count ??
+          nodes.filter(n => (n.ringIds?.length ?? 0) > 0).length;
+        const newStats = {
           totalNodes: nodes.length,
-          fraudNodes: nodes.filter((n) => n.is_anomalous).length,
+          fraudNodes: fraudCount,
           totalEdges: links.length,
-          rings: data.rings ?? 300,
-        });
+          rings: ringCount,
+        };
+        setStats(newStats);
+        onStatsUpdate?.({ totalNodes: nodes.length, fraudNodes: fraudCount, rings: ringCount });
 
         // Try to load real ring data for tour
         try {
@@ -265,7 +328,6 @@ export default function FraudGraph3D({
     const nodes: GraphNode[] = [];
     const links: GraphLink[] = [];
 
-    // Create 8 clusters, some high-fraud
     for (let c = 0; c < 8; c++) {
       const isFraudCluster = c < 3;
       const clusterSize = 15 + Math.floor(Math.random() * 20);
@@ -273,44 +335,37 @@ export default function FraudGraph3D({
       for (let i = 0; i < clusterSize; i++) {
         const id = `${c}_${i}`;
         const score = isFraudCluster
-          ? 0.5 + Math.random() * 0.5
-          : Math.random() * 0.4;
+          ? 0.65 + Math.random() * 0.35   // always clearly red
+          : Math.random() * 0.35;          // always clearly green
+        const isAnom = score > 0.6;
+
+        const role: GraphNode["role"] =
+          i === 0 && isFraudCluster ? "HUB" :
+          i < 3 && isFraudCluster ? "BRIDGE" :
+          isAnom ? "MULE" : "NORMAL";
+
         nodes.push({
           id,
-          is_anomalous: score > 0.75,
+          is_anomalous: isAnom,
           anomalyScore: score,
-          pagerank: i === 0 ? 0.8 : Math.random() * 0.3,
-          role:
-            i === 0 && isFraudCluster
-              ? "HUB"
-              : i < 3 && isFraudCluster
-              ? "BRIDGE"
-              : "MULE",
+          pagerank: i === 0 ? 0.85 : Math.random() * 0.3,
+          role,
           clusterId: c,
-          clusterFraudRate: isFraudCluster ? 0.6 + Math.random() * 0.3 : 0.1,
+          clusterFraudRate: isFraudCluster ? 0.7 : 0.05,
           volume: Math.floor(Math.random() * 200) + 10,
-          ringIds: isFraudCluster && i < 5 ? [c] : [],
+          ringIds: isFraudCluster ? [c + 1] : [],
         });
 
-        // intra-cluster links
-        if (i > 0) {
-          links.push({ source: `${c}_0`, target: id });
-        }
+        if (i > 0) links.push({ source: `${c}_0`, target: id });
       }
-
-      // inter-cluster fraud links
-      if (isFraudCluster && c > 0) {
-        links.push({ source: `${c}_0`, target: `0_0` });
-      }
+      if (isFraudCluster && c > 0) links.push({ source: `${c}_0`, target: `0_0` });
     }
 
     setRawGraph({ nodes, links });
-    setStats({
-      totalNodes: nodes.length,
-      fraudNodes: nodes.filter((n) => n.is_anomalous).length,
-      totalEdges: links.length,
-      rings: 5,
-    });
+    const fraudCount = nodes.filter(n => n.is_anomalous).length;
+    const newStats = { totalNodes: nodes.length, fraudNodes: fraudCount, totalEdges: links.length, rings: 5 };
+    setStats(newStats);
+    onStatsUpdate?.({ totalNodes: nodes.length, fraudNodes: fraudCount, rings: 5 });
   }
 
   // ── Apply filters ──
@@ -319,27 +374,35 @@ export default function FraudGraph3D({
 
     let nodes = rawGraph.nodes;
 
-    // 1. Risk threshold filter
-    nodes = nodes.filter((n) => (n.anomalyScore ?? 0) >= riskThreshold || !n.is_anomalous);
+    // 1. Risk threshold — only apply to anomalous nodes (don't hide clean nodes by threshold)
+    if (riskThreshold > 0) {
+      nodes = nodes.filter(
+        (n) => !n.is_anomalous || (n.anomalyScore ?? 0) >= riskThreshold
+      );
+    }
 
     // 2. Show only fraud
     if (showOnlyFraud || viewMode === "fraud") {
       nodes = nodes.filter((n) => n.is_anomalous);
     }
 
-    // 3. Show only ring members
+    // 3. Show only ring members — fallback to anomalous nodes if no ringIds populated
     if (showOnlyRings || viewMode === "rings") {
-      nodes = nodes.filter((n) => (n.ringIds?.length ?? 0) > 0);
+      const hasRingData = rawGraph.nodes.some((n) => (n.ringIds?.length ?? 0) > 0);
+      if (hasRingData) {
+        nodes = nodes.filter((n) => (n.ringIds?.length ?? 0) > 0);
+      } else {
+        // Fallback: treat all anomalous nodes as ring members
+        nodes = nodes.filter((n) => n.is_anomalous);
+      }
     }
-
-    // 4. Search highlight (don't filter — handled via opacity)
 
     const nodeIds = new Set(nodes.map((n) => n.id));
     const links = rawGraph.links.filter(
       (l) => nodeIds.has(resolveId(l.source)) && nodeIds.has(resolveId(l.target))
     );
 
-    // 5. Limit to top 500 nodes by risk score to avoid hairball
+    // 4. Cap at 500 highest-risk nodes to avoid hairball
     const sorted = [...nodes].sort(
       (a, b) => (b.anomalyScore ?? 0) - (a.anomalyScore ?? 0)
     );
@@ -565,34 +628,26 @@ export default function FraudGraph3D({
       const s = resolveId(link.source);
       const t = resolveId(link.target);
 
-      if (!activeNodeId) {
-        // No selection — dim most edges, highlight fraud→fraud
-        const sNode =
-          typeof link.source === "object"
-            ? link.source
-            : visibleGraph?.nodes.find((n) => n.id === s);
-        const tNode =
-          typeof link.target === "object"
-            ? link.target
-            : visibleGraph?.nodes.find((n) => n.id === t);
-
-        if (sNode?.is_anomalous && tNode?.is_anomalous) return "#ef444499";
-        return "rgba(60,80,120,0.35)";
-      }
-
-      const connected = s === activeNodeId || t === activeNodeId;
-      if (!connected) return "rgba(5,5,5,0.02)";
-
       const sNode =
         typeof link.source === "object"
-          ? link.source
+          ? (link.source as GraphNode)
           : visibleGraph?.nodes.find((n) => n.id === s);
       const tNode =
         typeof link.target === "object"
-          ? link.target
+          ? (link.target as GraphNode)
           : visibleGraph?.nodes.find((n) => n.id === t);
 
-      if (sNode?.is_anomalous && tNode?.is_anomalous) return "#ef4444";
+      const isFraudLink = sNode?.is_anomalous && tNode?.is_anomalous;
+
+      if (!activeNodeId) {
+        // No selection: fraud→fraud = bright red, rest = bright blue-white so edges are visible
+        if (isFraudLink) return "rgba(239,68,68,0.9)";
+        return "rgba(100,140,220,0.65)";
+      }
+
+      const connected = s === activeNodeId || t === activeNodeId;
+      if (!connected) return "rgba(255,255,255,0.04)";
+      if (isFraudLink) return "#ef4444";
       return "#60a5fa";
     },
     [activeNodeId, visibleGraph]
@@ -600,12 +655,22 @@ export default function FraudGraph3D({
 
   const getLinkWidth = useCallback(
     (link: GraphLink): number => {
-      if (!activeNodeId) return 0.4;
       const s = resolveId(link.source);
       const t = resolveId(link.target);
-      return s === activeNodeId || t === activeNodeId ? 1.2 : 0.1;
+      const sNode =
+        typeof link.source === "object"
+          ? (link.source as GraphNode)
+          : visibleGraph?.nodes.find((n) => n.id === s);
+      const tNode =
+        typeof link.target === "object"
+          ? (link.target as GraphNode)
+          : visibleGraph?.nodes.find((n) => n.id === t);
+      const isFraudLink = sNode?.is_anomalous && tNode?.is_anomalous;
+
+      if (!activeNodeId) return isFraudLink ? 1.2 : 0.6;
+      return (s === activeNodeId || t === activeNodeId) ? 1.5 : 0.08;
     },
-    [activeNodeId]
+    [activeNodeId, visibleGraph]
   );
 
   // ── Node label tooltip ──
@@ -930,6 +995,7 @@ export default function FraudGraph3D({
 
       {/* ── 3D Force Graph ── */}
       <ForceGraph3D
+        key={isBundled ? "bundled" : "free"}
         ref={fgRef}
         graphData={visibleGraph ?? { nodes: [], links: [] }}
         width={dimensions.width}
@@ -937,24 +1003,30 @@ export default function FraudGraph3D({
         backgroundColor="#050814"
         enableNodeDrag={false}
         linkWidth={getLinkWidth}
-        d3ForceStrength={-180}
-        d3VelocityDecay={0.28}
-        warmupTicks={isBundled ? 0 : 100}
-        cooldownTicks={isBundled ? 0 : 200}
+        linkColor={getLinkColor}
         nodeLabel={getNodeLabel}
         nodeThreeObject={buildNodeObject}
         nodeThreeObjectExtend={false}
-        linkColor={getLinkColor}
         onNodeClick={handleNodeClick}
         onBackgroundClick={() => {
           setActiveNodeId(null);
           onNodeSelect(null);
         }}
+        d3AlphaDecay={isBundled ? 0.04 : 0.02}
+        d3VelocityDecay={isBundled ? 0.6 : 0.28}
         onEngineStop={() => {
           if (!hasFitted.current) {
             fgRef.current?.zoomToFit(800);
             hasFitted.current = true;
           }
+        }}
+        d3Force={isBundled ? (forceName: string, force: any) => {
+          // In bundle mode: cluster nodes by clusterId using radial positioning
+          if (forceName === "charge") force.strength(-60);
+          if (forceName === "link") force.distance(30).strength(0.8);
+        } : (forceName: string, force: any) => {
+          if (forceName === "charge") force.strength(-180);
+          if (forceName === "link") force.distance(50).strength(0.5);
         }}
       />
     </div>

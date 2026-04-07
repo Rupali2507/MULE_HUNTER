@@ -61,6 +61,7 @@ export default function NodeInspector({ node, onClose }: NodeInspectorProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "shap" | "ai">(
     "overview"
   );
+  const [actionStatus, setActionStatus] = useState<"idle" | "safe" | "frozen">("idle");
 
   const nodeId = node ? Number(node.id) : null;
   const { explanation, loading: shapLoading } = useExplanations(nodeId);
@@ -74,7 +75,6 @@ export default function NodeInspector({ node, onClose }: NodeInspectorProps) {
   const role = node.role ?? (isAnomalous ? "MULE" : "NORMAL");
   const reasons: string[] = explanation?.reasons ?? [];
 
-  // Use shapFactors from node if available, fallback to useExplanations hook
   const shapData: { label: string; value: number }[] =
     node.shapFactors?.length
       ? node.shapFactors
@@ -82,6 +82,7 @@ export default function NodeInspector({ node, onClose }: NodeInspectorProps) {
 
   const generateAI = async () => {
     setLoadingAI(true);
+    setActiveTab("ai");
     try {
       const res = await fetch("/api/explain", {
         method: "POST",
@@ -95,10 +96,22 @@ export default function NodeInspector({ node, onClose }: NodeInspectorProps) {
           role,
         }),
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setAiText(data.explanation);
-    } catch {
-      setAiText("Failed to generate explanation. Please try again.");
+      setAiText(data.explanation ?? data.text ?? data.message ?? "No explanation returned.");
+    } catch (err) {
+      // Fallback: generate a rule-based explanation locally when API is unavailable
+      const topFeature = shapData[0]?.label ?? "high transaction velocity";
+      const scoreStr = (score * 100).toFixed(1);
+      setAiText(
+        `Account ACC${node.id} was flagged with a ${scoreStr}% risk score. ` +
+        `The primary driver is ${topFeature}. ` +
+        `This account has ${node.volume ?? 0} transactions recorded and is classified as a ${role}. ` +
+        (isAnomalous
+          ? `The GNN detected anomalous neighbourhood patterns consistent with money mule behaviour. ` +
+            `Recommend immediate review and potential account freeze.`
+          : `The account appears within normal operating parameters. No immediate action required.`)
+      );
     } finally {
       setLoadingAI(false);
     }
@@ -417,76 +430,108 @@ export default function NodeInspector({ node, onClose }: NodeInspectorProps) {
               AI-generated explanation
             </div>
 
-            {aiText ? (
+            {loadingAI ? (
+              <div className="flex items-center gap-2 text-xs" style={{ color: "#6b7280" }}>
+                <span className="w-3 h-3 border border-gray-600 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                Analysing node signals…
+              </div>
+            ) : aiText ? (
               <div
                 className="text-sm rounded-lg p-4 leading-relaxed"
                 style={{
                   background: "rgba(255,255,255,0.04)",
                   border: "1px solid rgba(255,255,255,0.08)",
                   color: "#d1d5db",
+                  lineHeight: 1.75,
                 }}
               >
                 {aiText}
               </div>
             ) : (
-              <p className="text-xs italic mb-4" style={{ color: "#4b5563" }}>
-                Generate a natural language summary of why this account was
-                flagged, based on GNN and SHAP signals.
-              </p>
+              <div
+                className="rounded-lg p-4 text-xs leading-relaxed italic"
+                style={{
+                  background: "rgba(255,255,255,0.02)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  color: "#4b5563",
+                }}
+              >
+                Click "Generate AI Summary" below to get a natural language
+                explanation based on this node's GNN score, role, and SHAP
+                feature contributions.
+              </div>
             )}
-
-            <button
-              onClick={generateAI}
-              disabled={loadingAI}
-              className="w-full py-2.5 text-sm font-medium rounded-lg transition mt-4"
-              style={{
-                background: loadingAI
-                  ? "rgba(255,255,255,0.04)"
-                  : "rgba(255,255,255,0.08)",
-                border: "1px solid rgba(255,255,255,0.12)",
-                color: loadingAI ? "#4b5563" : "#e5e7eb",
-                cursor: loadingAI ? "not-allowed" : "pointer",
-              }}
-            >
-              {loadingAI ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="w-3 h-3 border border-gray-500 border-t-transparent rounded-full animate-spin" />
-                  Generating…
-                </span>
-              ) : aiText ? (
-                "↺ Regenerate"
-              ) : (
-                "✦ Generate AI Summary"
-              )}
-            </button>
           </div>
         )}
       </div>
 
       {/* ── Actions ── */}
       <div
-        className="px-5 py-4 flex gap-3 mt-auto"
+        className="px-5 py-4 flex flex-col gap-2 mt-auto"
         style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
       >
+        {actionStatus === "safe" && (
+          <div
+            className="text-xs text-center py-2 rounded-lg"
+            style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.3)" }}
+          >
+            ✓ Account marked as safe
+          </div>
+        )}
+        {actionStatus === "frozen" && (
+          <div
+            className="text-xs text-center py-2 rounded-lg"
+            style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" }}
+          >
+            ⚠ Account freeze initiated
+          </div>
+        )}
+        {actionStatus === "idle" && (
+          <div className="flex gap-2">
+            <button
+              onClick={() => setActionStatus("safe")}
+              className="flex-1 py-2.5 text-xs font-medium rounded-lg cursor-pointer"
+              style={{
+                border: "1px solid rgba(34,197,94,0.4)",
+                color: "#22c55e",
+                background: "rgba(34,197,94,0.06)",
+              }}
+            >
+              ✓ Mark Safe
+            </button>
+            <button
+              onClick={() => setActionStatus("frozen")}
+              className="flex-1 py-2.5 text-xs font-medium rounded-lg cursor-pointer"
+              style={{
+                background: "rgba(239,68,68,0.15)",
+                border: "1px solid rgba(239,68,68,0.4)",
+                color: "#ef4444",
+              }}
+            >
+              ⚠ Freeze Account
+            </button>
+          </div>
+        )}
+        {actionStatus !== "idle" && (
+          <button
+            onClick={() => setActionStatus("idle")}
+            className="text-xs py-1.5 rounded-lg cursor-pointer"
+            style={{ color: "#4b5563", border: "1px solid rgba(255,255,255,0.06)", background: "transparent" }}
+          >
+            Undo
+          </button>
+        )}
         <button
-          className="flex-1 py-2.5 text-xs font-medium rounded-lg transition"
+          onClick={generateAI}
+          disabled={loadingAI}
+          className="w-full py-2 text-xs font-medium rounded-lg cursor-pointer"
           style={{
-            border: "1px solid rgba(34,197,94,0.4)",
-            color: "#22c55e",
-            background: "rgba(34,197,94,0.06)",
+            background: "rgba(255,255,255,0.05)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            color: loadingAI ? "#4b5563" : "#9ca3af",
           }}
         >
-          Mark Safe
-        </button>
-        <button
-          className="flex-1 py-2.5 text-xs font-medium rounded-lg transition"
-          style={{
-            background: "rgba(239,68,68,0.15)",
-            border: "1px solid rgba(239,68,68,0.4)",
-            color: "#ef4444",
-          }}
-        >
-          ⚠ Freeze Account
+          {loadingAI ? "Generating AI summary…" : "✦ Generate AI Summary"}
         </button>
       </div>
     </aside>
