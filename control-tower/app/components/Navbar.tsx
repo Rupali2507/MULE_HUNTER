@@ -24,7 +24,6 @@ const Navbar = () => {
         
         {/* LEFT: Logo & Mobile Toggle */}
         <div className="flex items-center gap-4">
-          {/* Hamburger Button (Visible only on mobile) */}
           <button 
             className="md:hidden text-gray-400 hover:text-[#CAFF33] transition-colors"
             onClick={toggleMenu}
@@ -45,12 +44,12 @@ const Navbar = () => {
           </div>
         </div>
 
-        {/* CENTER: Navigation Links (Hidden on mobile, flex on desktop) */}
+        {/* CENTER: Navigation Links */}
         <div className="hidden md:flex gap-8 text-gray-400 text-sm font-medium items-center">
           <NavContent session={session} />
         </div>
 
-        {/* RIGHT: Auth Section (Always visible) */}
+        {/* RIGHT: Auth Section */}
         <div className="flex items-center">
           {status === "loading" ? (
             <div className="h-8 w-20 bg-gray-800 animate-pulse rounded-full" />
@@ -72,7 +71,7 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* MOBILE DROPDOWN (Visible only when isMenuOpen is true) */}
+      {/* MOBILE DROPDOWN */}
       {isMenuOpen && (
         <div className="absolute top-full left-0 w-full bg-[#1A1A1A] border-b border-gray-800 flex flex-col p-6 gap-6 md:hidden animate-in slide-in-from-top-2 duration-200">
           <NavContent session={session} onLinkClick={() => setIsMenuOpen(false)} />
@@ -82,14 +81,15 @@ const Navbar = () => {
   );
 };
 
-// Extracted Nav Links to avoid repetition
 const NavContent = ({ session, onLinkClick }: { session: any, onLinkClick?: () => void }) => (
   <>
     <Link href="/" onClick={onLinkClick} className="hover:text-[#CAFF33] transition-colors">Home</Link>
+    
+
+    <Link href="/demo" onClick={onLinkClick} className="hover:text-[#CAFF33] transition-colors">Demo</Link>
     <Link href="/dashboard" onClick={onLinkClick} className="hover:text-[#CAFF33] transition-colors">
-  Fraud Dashboard
-</Link>
-    {/* <Link href="/pay" onClick={onLinkClick} className="hover:text-[#CAFF33] transition-colors">Demo</Link> */}
+      Fraud Dashboard
+    </Link>
 
     <Link href="/network" onClick={onLinkClick} className="hover:text-[#CAFF33] transition-colors">Network</Link>
     <Link href="/stats" onClick={onLinkClick} className="hover:text-[#CAFF33] transition-colors">Stats</Link>
