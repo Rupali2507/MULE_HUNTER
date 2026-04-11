@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 
-const ML_URL  = process.env.NEXT_PUBLIC_ML_URL ?? "http://localhost:8001";
+const ML_URL  = process.env.NEXT_PUBLIC_ML_URL ?? "http://56.228.10.113:8001";
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 const NAV = [
