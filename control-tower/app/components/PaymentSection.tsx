@@ -1,67 +1,86 @@
 "use client";
 
-/**
- * PaymentSection.tsx  —  MULE_HUNTER Control Tower
- *
- * Drop-in replacement for the mock Pay section.
- *
- * HOW IT WORKS
- * ─────────────
- * 1. User fills UPI payment form.
- * 2. On submit we POST to /api/transactions (the real Spring Boot backend).
- * 3. Backend returns { decision, finalRisk, … } (score 0–1).
- * 4. We interpret the verdict:
- *      APPROVE  (score < 0.45) → transaction succeeds
- *      REVIEW   (0.45 – 0.75) → KYC required within 24 h + penalty applied
- *      BLOCK    (score ≥ 0.75) → KYC required within 12 h, all UPI suspended
- * 5. All state is stored in localStorage so the KYC timer persists across reloads.
- *
- * INTEGRATION
- * ───────────
- * • Replace `BACKEND_URL` if your Spring Boot is not on port 8082.
- * • The component reads/writes `mh_kyc_state` from localStorage.
- * • Mount inside your existing dashboard layout:
- *       import PaymentSection from "@/components/PaymentSection";
- *       <PaymentSection currentUserAccount="1553" />
- */
-
 import { useState, useEffect, useCallback, useRef } from "react";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8080";
 
-// Penalty schedule (INR)
-const PENALTY_REVIEW = 500;   // applied immediately on REVIEW verdict
-const PENALTY_BLOCK  = 2000;  // applied immediately on BLOCK verdict
-const PENALTY_KYC_MISS_REVIEW = 1000; // extra if KYC not done within 24 h
-const PENALTY_KYC_MISS_BLOCK  = 5000; // extra if KYC not done within 12 h
+const PENALTY_REVIEW = 500;
+const PENALTY_BLOCK  = 2000;
+const PENALTY_KYC_MISS_REVIEW = 1000;
+const PENALTY_KYC_MISS_BLOCK  = 5000;
 
-// KYC deadlines
 const KYC_DEADLINE_REVIEW_H = 24;
 const KYC_DEADLINE_BLOCK_H  = 12;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Decision = "APPROVE" | "REVIEW" | "BLOCK";
 
+// ✅ Fixed: matches actual backend response shape exactly
 interface TransactionResponse {
   transactionId: string;
   decision: Decision;
-  finalRisk: number;
-  gnnScore?: number;
-  eifScore?: number;
-  behaviorScore?: number;
-  blockReason?: string;
-  timestamp?: string;
+  riskScore: number;          // was "finalRisk" — backend sends "riskScore"
+  riskLevel: string;
+  suspectedFraud: boolean;
+
+  modelScores: {
+    gnn: number;
+    eif: number;
+    behavior: number;
+    graph: number;
+    ja3: number;
+    confidence: number;
+    eifConfidence: number;
+    eifExplanation: string;
+    eifTopFactors: Record<string, number>;
+  };
+
+  networkMetrics: {
+    suspiciousNeighbors: number;
+    sharedDevices: number;
+    sharedIPs: number;
+    centralityScore: number | null;
+    transactionLoops: number | null;
+  };
+
+  fraudCluster: {
+    clusterId: number;
+    clusterSize: number;
+    clusterRiskScore: number | null;
+  };
+
+  muleRingDetection: {
+    isMuleRingMember: boolean;
+    ringShape: string;
+    ringSize: number;
+    role: string;
+    hubAccount: string;
+    ringAccounts: string[];
+  };
+
+  riskFactors: string[];       // was "blockReason: string" — backend sends array
+
+  ja3Security: {
+    ja3Risk: number;
+    ja3Detected: boolean;
+    velocity: number;
+    fanout: number;
+    isNewDevice: boolean;
+    isNewJa3: boolean;
+  };
+
+  embeddingNorm: number;
 }
 
 interface KycState {
   status: "none" | "pending_review" | "pending_block" | "completed" | "overdue";
-  deadlineIso: string | null;   // ISO timestamp
+  deadlineIso: string | null;
   deadlineHours: number | null;
   penaltyApplied: number;
   penaltyExtra: number;
-  triggeredBy: string | null;   // transactionId
+  triggeredBy: string | null;
   accountBlocked: boolean;
 }
 
@@ -183,20 +202,30 @@ function RiskGauge({ score }: { score: number }) {
   );
 }
 
+// ✅ Fixed: reads from nested modelScores, uses riskScore for final
 function ScoreBreakdown({ result }: { result: TransactionResponse }) {
   const rows = [
-    { label: "GNN (graph network)", value: result.gnnScore, weight: "40%" },
-    { label: "EIF (anomaly forest)", value: result.eifScore, weight: "20%" },
-    { label: "Behavior", value: result.behaviorScore, weight: "25%" },
-    { label: "Final composite", value: result.finalRisk, weight: "—" },
+    { label: "GNN (graph network)", value: result.modelScores?.gnn,      weight: "40%" },
+    { label: "EIF (anomaly forest)", value: result.modelScores?.eif,     weight: "20%" },
+    { label: "Behavior",             value: result.modelScores?.behavior, weight: "25%" },
+    { label: "Graph",                value: result.modelScores?.graph,    weight: "15%" },
+    { label: "Final composite",      value: result.riskScore,             weight: "—"   },
   ];
   return (
-    <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse", fontFamily: "monospace", marginTop: 8 }}>
+    <table
+      style={{
+        width: "100%",
+        fontSize: 12,
+        borderCollapse: "collapse",
+        fontFamily: "monospace",
+        marginTop: 8,
+      }}
+    >
       <thead>
         <tr style={{ borderBottom: "1px solid #374151" }}>
-          <th style={{ textAlign: "left", color: "#6b7280", fontWeight: 400, padding: "4px 0" }}>Signal</th>
+          <th style={{ textAlign: "left",   color: "#6b7280", fontWeight: 400, padding: "4px 0" }}>Signal</th>
           <th style={{ textAlign: "center", color: "#6b7280", fontWeight: 400 }}>Weight</th>
-          <th style={{ textAlign: "right", color: "#6b7280", fontWeight: 400 }}>Score</th>
+          <th style={{ textAlign: "right",  color: "#6b7280", fontWeight: 400 }}>Score</th>
         </tr>
       </thead>
       <tbody>
@@ -220,13 +249,124 @@ function ScoreBreakdown({ result }: { result: TransactionResponse }) {
   );
 }
 
+// ── Extra detail panel (new) ──────────────────────────────────────────────────
+function DetailPanel({ result }: { result: TransactionResponse }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ marginTop: 12 }}>
+      <button
+        onClick={() => setOpen((p) => !p)}
+        style={{
+          background: "transparent",
+          border: "1px solid #374151",
+          borderRadius: 6,
+          color: "#6b7280",
+          fontSize: 11,
+          padding: "4px 10px",
+          cursor: "pointer",
+          fontFamily: "monospace",
+          letterSpacing: "0.05em",
+        }}
+      >
+        {open ? "▲ HIDE DETAILS" : "▼ SHOW DETAILS"}
+      </button>
+
+      {open && (
+        <div style={{ marginTop: 10, fontSize: 11, fontFamily: "monospace", color: "#9ca3af" }}>
+
+          {/* Network metrics */}
+          <p style={{ color: "#6b7280", margin: "8px 0 4px", letterSpacing: "0.06em" }}>
+            NETWORK METRICS
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 16px" }}>
+            <span>Suspicious neighbors</span>
+            <span style={{ color: "#f9fafb", textAlign: "right" }}>
+              {result.networkMetrics?.suspiciousNeighbors ?? "—"}
+            </span>
+            <span>Shared devices</span>
+            <span style={{ color: "#f9fafb", textAlign: "right" }}>
+              {result.networkMetrics?.sharedDevices ?? "—"}
+            </span>
+            <span>Shared IPs</span>
+            <span style={{ color: "#f9fafb", textAlign: "right" }}>
+              {result.networkMetrics?.sharedIPs ?? "—"}
+            </span>
+          </div>
+
+          {/* Mule ring */}
+          <p style={{ color: "#6b7280", margin: "10px 0 4px", letterSpacing: "0.06em" }}>
+            MULE RING DETECTION
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 16px" }}>
+            <span>Ring member</span>
+            <span style={{ color: result.muleRingDetection?.isMuleRingMember ? "#f87171" : "#4ade80", textAlign: "right" }}>
+              {result.muleRingDetection?.isMuleRingMember ? "YES" : "NO"}
+            </span>
+            <span>Role</span>
+            <span style={{ color: "#f9fafb", textAlign: "right" }}>
+              {result.muleRingDetection?.role ?? "—"}
+            </span>
+            <span>Ring shape</span>
+            <span style={{ color: "#f9fafb", textAlign: "right" }}>
+              {result.muleRingDetection?.ringShape ?? "—"}
+            </span>
+            <span>Ring size</span>
+            <span style={{ color: "#f9fafb", textAlign: "right" }}>
+              {result.muleRingDetection?.ringSize ?? "—"}
+            </span>
+          </div>
+
+          {/* JA3 */}
+          <p style={{ color: "#6b7280", margin: "10px 0 4px", letterSpacing: "0.06em" }}>
+            JA3 SECURITY
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 16px" }}>
+            <span>JA3 detected</span>
+            <span style={{ color: result.ja3Security?.ja3Detected ? "#f87171" : "#4ade80", textAlign: "right" }}>
+              {result.ja3Security?.ja3Detected ? "YES" : "NO"}
+            </span>
+            <span>JA3 risk</span>
+            <span style={{ color: "#f9fafb", textAlign: "right" }}>
+              {result.ja3Security?.ja3Risk?.toFixed(3) ?? "—"}
+            </span>
+            <span>New device</span>
+            <span style={{ color: "#f9fafb", textAlign: "right" }}>
+              {result.ja3Security?.isNewDevice ? "YES" : "NO"}
+            </span>
+          </div>
+
+          {/* EIF explanation */}
+          {result.modelScores?.eifExplanation && (
+            <>
+              <p style={{ color: "#6b7280", margin: "10px 0 4px", letterSpacing: "0.06em" }}>
+                EIF EXPLANATION
+              </p>
+              <p style={{ color: "#d1d5db", margin: 0, lineHeight: 1.5 }}>
+                {result.modelScores.eifExplanation}
+              </p>
+            </>
+          )}
+
+          {/* Embedding norm */}
+          <p style={{ color: "#6b7280", margin: "10px 0 4px", letterSpacing: "0.06em" }}>
+            EMBEDDING NORM
+          </p>
+          <span style={{ color: "#f9fafb" }}>
+            {result.embeddingNorm?.toFixed(4) ?? "—"}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface KycBannerProps {
   kyc: KycState;
   onCompleteKyc: () => void;
   account: string;
 }
 
-function KycBanner({ kyc, onCompleteKyc, account }: KycBannerProps) {
+function KycBanner({ kyc, onCompleteKyc }: KycBannerProps) {
   const [countdown, setCountdown] = useState(() =>
     fmtCountdown(msLeft(kyc.deadlineIso))
   );
@@ -243,9 +383,9 @@ function KycBanner({ kyc, onCompleteKyc, account }: KycBannerProps) {
   const isBlock = kyc.status === "pending_block" || kyc.accountBlocked;
   const overdue = msLeft(kyc.deadlineIso) <= 0;
 
-  const bannerBg = isBlock ? "#450a0a" : "#451a03";
+  const bannerBg     = isBlock ? "#450a0a" : "#451a03";
   const bannerBorder = isBlock ? "#dc2626" : "#d97706";
-  const icon = isBlock ? "🔴" : "🟡";
+  const icon         = isBlock ? "🔴" : "🟡";
 
   return (
     <div
@@ -289,14 +429,7 @@ function KycBanner({ kyc, onCompleteKyc, account }: KycBannerProps) {
       </p>
 
       {!overdue && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            marginBottom: 12,
-          }}
-        >
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
           <span style={{ fontSize: 11, color: "#9ca3af" }}>TIME REMAINING</span>
           <span
             style={{
@@ -336,23 +469,16 @@ function KycBanner({ kyc, onCompleteKyc, account }: KycBannerProps) {
   );
 }
 
-// ── KYC Modal (simulated) ─────────────────────────────────────────────────────
-function KycModal({
-  onClose,
-  onSuccess,
-}: {
-  onClose: () => void;
-  onSuccess: () => void;
-}) {
-  const [step, setStep] = useState<"form" | "verifying" | "done">("form");
+// ── KYC Modal ─────────────────────────────────────────────────────────────────
+function KycModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const [step, setStep]     = useState<"form" | "verifying" | "done">("form");
   const [aadhaar, setAadhaar] = useState("");
-  const [pan, setPan] = useState("");
+  const [pan, setPan]       = useState("");
   const [selfie, setSelfie] = useState(false);
 
   async function submit() {
     if (aadhaar.length < 12 || pan.length < 10 || !selfie) return;
     setStep("verifying");
-    // Simulate verification delay
     await new Promise((r) => setTimeout(r, 2400));
     setStep("done");
     setTimeout(onSuccess, 1200);
@@ -553,22 +679,18 @@ export default function PaymentSection({
 }: {
   currentUserAccount?: string;
 }) {
-  // Form state
-  const [toUpi, setToUpi] = useState("");
+  const [toUpi, setToUpi]     = useState("");
   const [toAccount, setToAccount] = useState("");
-  const [amount, setAmount] = useState("");
-  const [note, setNote] = useState("");
+  const [amount, setAmount]   = useState("");
+  const [note, setNote]       = useState("");
 
-  // UI state
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<TransactionResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading]         = useState(false);
+  const [result, setResult]           = useState<TransactionResponse | null>(null);
+  const [error, setError]             = useState<string | null>(null);
   const [showKycModal, setShowKycModal] = useState(false);
 
-  // KYC state
   const [kyc, setKyc] = useState<KycState>(() => loadKyc(currentUserAccount));
 
-  // Keep KYC overdue status updated
   const kycRef = useRef(kyc);
   kycRef.current = kyc;
 
@@ -578,8 +700,7 @@ export default function PaymentSection({
       if (
         (cur.status === "pending_review" || cur.status === "pending_block") &&
         cur.deadlineIso &&
-        msLeft(cur.deadlineIso) <= 0 
-        // cur.status !== "overdue"
+        msLeft(cur.deadlineIso) <= 0
       ) {
         const extra =
           cur.status === "pending_block"
@@ -598,9 +719,7 @@ export default function PaymentSection({
     return () => clearInterval(t);
   }, [currentUserAccount]);
 
-  const accountBlocked =
-    kyc.accountBlocked &&
-    kyc.status !== "completed";
+  const accountBlocked = kyc.accountBlocked && kyc.status !== "completed";
 
   const applyKycState = useCallback(
     (decision: Decision, txId: string) => {
@@ -611,12 +730,11 @@ export default function PaymentSection({
       const deadline = new Date(
         Date.now() + hoursDeadline * 60 * 60 * 1000
       ).toISOString();
-      const penalty =
-        decision === "BLOCK" ? PENALTY_BLOCK : PENALTY_REVIEW;
+      const penalty = decision === "BLOCK" ? PENALTY_BLOCK : PENALTY_REVIEW;
 
       const updated: KycState = {
         status: decision === "BLOCK" ? "pending_block" : "pending_review",
-        deadlineIso: kyc.deadlineIso ?? deadline, // don't reset existing timer
+        deadlineIso: kyc.deadlineIso ?? deadline,
         deadlineHours: hoursDeadline,
         penaltyApplied: kyc.penaltyApplied + penalty,
         penaltyExtra: 0,
@@ -659,7 +777,7 @@ export default function PaymentSection({
       sourceAccount: currentUserAccount,
       targetAccount: toAccount,
       amount: parseFloat(amount),
-      timestamp: new Date().toISOString().slice(0, 19), // no trailing Z
+      timestamp: new Date().toISOString(), // "2026-04-11T16:44:43.701Z"
       note,
       upiId: toUpi,
     };
@@ -679,10 +797,9 @@ export default function PaymentSection({
       const data: TransactionResponse = await res.json();
       setResult(data);
 
-      // Apply KYC state based on verdict
-      applyKycState(data.decision ?? "APPROVE", data.transactionId ?? payload.transactionId);
+      // ✅ Fixed: decision is always present, no fallback needed
+      applyKycState(data.decision, data.transactionId);
 
-      // Clear form on approve
       if (data.decision === "APPROVE") {
         setToUpi("");
         setToAccount("");
@@ -696,7 +813,6 @@ export default function PaymentSection({
     }
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div
       style={{
@@ -706,18 +822,24 @@ export default function PaymentSection({
         color: "#f9fafb",
       }}
     >
-      <h2 style={{ fontSize: 16, fontWeight: 700, letterSpacing: "0.12em", marginBottom: 18, color: "#f9fafb" }}>
+      <h2
+        style={{
+          fontSize: 16,
+          fontWeight: 700,
+          letterSpacing: "0.12em",
+          marginBottom: 18,
+          color: "#f9fafb",
+        }}
+      >
         ▶ UPI PAYMENT
       </h2>
 
-      {/* KYC banner */}
       <KycBanner
         kyc={kyc}
         account={currentUserAccount}
         onCompleteKyc={() => setShowKycModal(true)}
       />
 
-      {/* Penalty summary chip */}
       {kyc.penaltyApplied > 0 && (
         <div
           style={{
@@ -752,7 +874,15 @@ export default function PaymentSection({
         }}
       >
         <div style={{ marginBottom: 14 }}>
-          <label style={{ fontSize: 11, color: "#6b7280", display: "block", marginBottom: 5, letterSpacing: "0.08em" }}>
+          <label
+            style={{
+              fontSize: 11,
+              color: "#6b7280",
+              display: "block",
+              marginBottom: 5,
+              letterSpacing: "0.08em",
+            }}
+          >
             UPI ID (optional)
           </label>
           <input
@@ -774,7 +904,15 @@ export default function PaymentSection({
         </div>
 
         <div style={{ marginBottom: 14 }}>
-          <label style={{ fontSize: 11, color: "#6b7280", display: "block", marginBottom: 5, letterSpacing: "0.08em" }}>
+          <label
+            style={{
+              fontSize: 11,
+              color: "#6b7280",
+              display: "block",
+              marginBottom: 5,
+              letterSpacing: "0.08em",
+            }}
+          >
             RECIPIENT ACCOUNT ID *
           </label>
           <input
@@ -799,7 +937,15 @@ export default function PaymentSection({
         </div>
 
         <div style={{ marginBottom: 14 }}>
-          <label style={{ fontSize: 11, color: "#6b7280", display: "block", marginBottom: 5, letterSpacing: "0.08em" }}>
+          <label
+            style={{
+              fontSize: 11,
+              color: "#6b7280",
+              display: "block",
+              marginBottom: 5,
+              letterSpacing: "0.08em",
+            }}
+          >
             AMOUNT (₹) *
           </label>
           <input
@@ -825,7 +971,15 @@ export default function PaymentSection({
         </div>
 
         <div style={{ marginBottom: 18 }}>
-          <label style={{ fontSize: 11, color: "#6b7280", display: "block", marginBottom: 5, letterSpacing: "0.08em" }}>
+          <label
+            style={{
+              fontSize: 11,
+              color: "#6b7280",
+              display: "block",
+              marginBottom: 5,
+              letterSpacing: "0.08em",
+            }}
+          >
             NOTE (optional)
           </label>
           <input
@@ -906,12 +1060,12 @@ export default function PaymentSection({
         </div>
       )}
 
-      {/* Result card */}
+      {/* ✅ Result card — uses riskScore, modelScores.*, riskFactors[] */}
       {result && (
         <div
           style={{
             background: "#0f172a",
-            border: `1px solid ${riskColor(result.finalRisk)}`,
+            border: `1px solid ${riskColor(result.riskScore)}`,
             borderRadius: 12,
             padding: "1.25rem",
             fontSize: 12,
@@ -930,23 +1084,23 @@ export default function PaymentSection({
               style={{
                 fontSize: 13,
                 fontWeight: 700,
-                color: riskColor(result.finalRisk),
+                color: riskColor(result.riskScore),
                 letterSpacing: "0.1em",
               }}
             >
               {result.decision === "APPROVE" && "✓ TRANSACTION APPROVED"}
-              {result.decision === "REVIEW" && "⚠ FLAGGED FOR REVIEW"}
-              {result.decision === "BLOCK" && "✗ TRANSACTION BLOCKED"}
+              {result.decision === "REVIEW"  && "⚠ FLAGGED FOR REVIEW"}
+              {result.decision === "BLOCK"   && "✗ TRANSACTION BLOCKED"}
             </span>
             <span style={{ color: "#4b5563", fontSize: 10 }}>
               {result.transactionId?.slice(0, 8)}…
             </span>
           </div>
 
-          {/* Risk gauge */}
-          <RiskGauge score={result.finalRisk} />
+          {/* Risk gauge — ✅ uses riskScore */}
+          <RiskGauge score={result.riskScore} />
 
-          {/* Score breakdown */}
+          {/* Score breakdown — ✅ reads modelScores.* */}
           <ScoreBreakdown result={result} />
 
           {/* Verdict explanation */}
@@ -962,8 +1116,9 @@ export default function PaymentSection({
           >
             {result.decision === "APPROVE" && (
               <p style={{ margin: 0 }}>
-                Risk score below threshold. Payment of ₹{Number(amount).toLocaleString("en-IN")} to
-                account {toAccount} processed successfully.
+                Risk score below threshold. Payment of ₹
+                {Number(amount).toLocaleString("en-IN")} to account {toAccount} processed
+                successfully.
               </p>
             )}
             {result.decision === "REVIEW" && (
@@ -972,9 +1127,10 @@ export default function PaymentSection({
                 <strong style={{ color: "#fbbf24" }}>
                   You must complete KYC within {KYC_DEADLINE_REVIEW_H} hours
                 </strong>{" "}
-                to restore full services. A penalty of ₹{PENALTY_REVIEW.toLocaleString("en-IN")} has been applied.
-                Missing the KYC deadline will incur an additional
-                ₹{PENALTY_KYC_MISS_REVIEW.toLocaleString("en-IN")} penalty.
+                to restore full services. A penalty of ₹
+                {PENALTY_REVIEW.toLocaleString("en-IN")} has been applied. Missing the KYC
+                deadline will incur an additional ₹
+                {PENALTY_KYC_MISS_REVIEW.toLocaleString("en-IN")} penalty.
               </p>
             )}
             {result.decision === "BLOCK" && (
@@ -983,23 +1139,33 @@ export default function PaymentSection({
                 <strong style={{ color: "#f87171" }}>
                   ALL UPI transactions are now suspended.
                 </strong>{" "}
-                Complete KYC within {KYC_DEADLINE_BLOCK_H} hours to reinstate your account. Penalty: ₹
-                {PENALTY_BLOCK.toLocaleString("en-IN")}. Failure to complete KYC will add
-                ₹{PENALTY_KYC_MISS_BLOCK.toLocaleString("en-IN")} and trigger regulatory escalation.
+                Complete KYC within {KYC_DEADLINE_BLOCK_H} hours to reinstate your account.
+                Penalty: ₹{PENALTY_BLOCK.toLocaleString("en-IN")}. Failure to complete KYC
+                will add ₹{PENALTY_KYC_MISS_BLOCK.toLocaleString("en-IN")} and trigger
+                regulatory escalation.
               </p>
             )}
           </div>
 
-          {/* Reason */}
-          {result.blockReason && (
-            <p style={{ marginTop: 10, color: "#6b7280", fontSize: 11, letterSpacing: "0.04em" }}>
-              REASON: {result.blockReason}
+          {/* ✅ Risk factors — was blockReason string, now riskFactors[] */}
+          {result.riskFactors?.length > 0 && (
+            <p
+              style={{
+                marginTop: 10,
+                color: "#6b7280",
+                fontSize: 11,
+                letterSpacing: "0.04em",
+              }}
+            >
+              REASON: {result.riskFactors.join(", ")}
             </p>
           )}
+
+          {/* Expandable detail panel */}
+          <DetailPanel result={result} />
         </div>
       )}
 
-      {/* KYC modal */}
       {showKycModal && (
         <KycModal
           onClose={() => setShowKycModal(false)}
