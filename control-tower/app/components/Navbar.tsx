@@ -88,12 +88,12 @@ const NavContent = ({ session, onLinkClick }: { session: any, onLinkClick?: () =
       Home
     </Link>
 
-    <Link href="/demo" target="_blank" rel="noopener noreferrer" onClick={onLinkClick} className="hover:text-[#CAFF33] transition-colors">
+    <Link href="/demo" onClick={onLinkClick} className="hover:text-[#CAFF33] transition-colors">
       Demo
     </Link>
 
-    <Link href="/dashboard" target="_blank" rel="noopener noreferrer" onClick={onLinkClick} className="hover:text-[#CAFF33] transition-colors">
-      Fraud Dashboard
+    <Link href="/dashboard"  onClick={onLinkClick} className="hover:text-[#CAFF33] transition-colors">
+      Forensic Dashboard
     </Link>
 
     <Link href="/network" target="_blank" rel="noopener noreferrer" onClick={onLinkClick} className="hover:text-[#CAFF33] transition-colors">
@@ -104,7 +104,7 @@ const NavContent = ({ session, onLinkClick }: { session: any, onLinkClick?: () =
       Stats
     </Link>
 
-    <Link href="/service" target="_blank" rel="noopener noreferrer" onClick={onLinkClick} className="hover:text-[#CAFF33] transition-colors">
+    <Link href="/service" onClick={onLinkClick} className="hover:text-[#CAFF33] transition-colors">
       Request Service
     </Link>
     
