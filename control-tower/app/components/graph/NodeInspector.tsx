@@ -133,7 +133,7 @@ export function NodeInspector({ node, onClose }: NodeInspectorProps) {
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState<string | null>(null);
 
-  const API_BASE = process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? "http://localhost:8080";
+  const API_BASE = process.env.NEXT_PUBLIC_BACKEND_BASE_URL ;
 
   useEffect(() => {
     if (!node?.id) return;
